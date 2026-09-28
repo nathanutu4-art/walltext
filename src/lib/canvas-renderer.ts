@@ -301,7 +301,7 @@ export class CanvasRenderer {
       for (const textItem of cell.vector_data.texts) {
         if (!textItem || !textItem.text) continue;
 
-        const fontSize = Math.max(8, (textItem.size || 18) * scale);
+        const fontSize = Math.max(2, (textItem.size || 20) * scale);
         const fontFace = textItem.font === 'pixel'
           ? 'var(--font-pixel), monospace'
           : textItem.font === 'vt323'
@@ -329,6 +329,22 @@ export class CanvasRenderer {
           ctx.fillText(line, tx, startY + idx * lineHeight);
         });
       }
+    } else if (cell.message_text) {
+      // Fallback for legacy or text-only cells
+      const fontSize = Math.max(2, 20 * scale);
+      ctx.font = `700 ${fontSize}px var(--font-pixel), monospace`;
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const lines = cell.message_text.split('\n');
+      const lineHeight = fontSize * 1.3;
+      const totalHeight = lines.length * lineHeight;
+      const startY = screenY + cellSize / 2 - totalHeight / 2 + lineHeight / 2;
+
+      lines.forEach((line, idx) => {
+        ctx.fillText(line, screenX + cellSize / 2, startY + idx * lineHeight);
+      });
     }
 
     ctx.restore();

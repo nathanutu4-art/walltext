@@ -75,7 +75,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
 
   // Text Tool inputs & on-canvas direct writing state
   const [inputText, setInputText] = useState<string>('');
-  const [fontSize, setFontSize] = useState<number>(18);
+  const [fontSize, setFontSize] = useState<number>(20);
   const [fontFamily, setFontFamily] = useState<string>('pixel');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
   const [onCanvasTextPos, setOnCanvasTextPos] = useState<{ x: number; y: number } | null>(null);
@@ -99,6 +99,88 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     if (font === 'serif') return 'serif';
     return font || 'sans-serif';
   }, []);
+
+  // Synchronized text property updates for real-time reactivity
+  const handleFontSizeChange = useCallback((newSize: number) => {
+    const clamped = Math.max(10, Math.min(72, newSize));
+    setFontSize(clamped);
+    if (editingTextIndex !== null) {
+      setTexts((prev) => {
+        const updated = [...prev];
+        if (updated[editingTextIndex]) {
+          updated[editingTextIndex] = {
+            ...updated[editingTextIndex],
+            size: clamped,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [editingTextIndex]);
+
+  const handleFontFamilyChange = useCallback((newFont: string) => {
+    setFontFamily(newFont);
+    if (editingTextIndex !== null) {
+      setTexts((prev) => {
+        const updated = [...prev];
+        if (updated[editingTextIndex]) {
+          updated[editingTextIndex] = {
+            ...updated[editingTextIndex],
+            font: newFont,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [editingTextIndex]);
+
+  const handleTextColorChange = useCallback((newColor: string) => {
+    setBrushColor(newColor);
+    if (editingTextIndex !== null) {
+      setTexts((prev) => {
+        const updated = [...prev];
+        if (updated[editingTextIndex]) {
+          updated[editingTextIndex] = {
+            ...updated[editingTextIndex],
+            color: newColor,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [editingTextIndex]);
+
+  const handleTextAlignChange = useCallback((newAlign: 'left' | 'center' | 'right') => {
+    setTextAlign(newAlign);
+    if (editingTextIndex !== null) {
+      setTexts((prev) => {
+        const updated = [...prev];
+        if (updated[editingTextIndex]) {
+          updated[editingTextIndex] = {
+            ...updated[editingTextIndex],
+            align: newAlign,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [editingTextIndex]);
+
+  const handleInputTextChange = useCallback((val: string) => {
+    setInputText(val);
+    if (editingTextIndex !== null) {
+      setTexts((prev) => {
+        const updated = [...prev];
+        if (updated[editingTextIndex]) {
+          updated[editingTextIndex] = {
+            ...updated[editingTextIndex],
+            text: val,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [editingTextIndex]);
 
   // Commit text from in-place on-canvas editor or sidebar
   const commitText = useCallback(() => {
@@ -219,7 +301,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       const textItem = texts[idx];
       if (!textItem || !textItem.text) continue;
 
-      const fSize = Math.max(8, (textItem.size || 18) * scale);
+      const fSize = Math.max(8, (textItem.size || 20) * scale);
       const fFace = getResolvedFont(textItem.font);
       ctx.font = `700 ${fSize}px ${fFace}, system-ui`;
       ctx.fillStyle = textItem.color || '#ffffff';
@@ -236,6 +318,27 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       lines.forEach((line, i) => {
         ctx.fillText(line, tx, startY + i * lineHeight);
       });
+
+      // Subtle dashed selection outline if Text tool is active
+      if (activeTool === 'text' && !onCanvasTextPos) {
+        let maxW = 0;
+        lines.forEach((line) => {
+          const w = ctx.measureText(line).width;
+          if (w > maxW) maxW = w;
+        });
+        const pad = 4;
+        let bx = tx - maxW / 2 - pad;
+        if (textItem.align === 'left') bx = tx - pad;
+        if (textItem.align === 'right') bx = tx - maxW - pad;
+        const by = ty - totalHeight / 2 - pad;
+
+        ctx.save();
+        ctx.strokeStyle = idx === editingTextIndex ? '#f59e0b' : 'rgba(251, 191, 36, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.strokeRect(bx, by, maxW + pad * 2, totalHeight + pad * 2);
+        ctx.restore();
+      }
     }
 
     // Live Hover Ghost Preview (when Text tool is active and no active in-place editor)
@@ -539,13 +642,15 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                 <div
                   className="absolute z-20 flex flex-col items-center pointer-events-auto"
                   style={{
-                    left: `${(onCanvasTextPos.x / 255) * 100}%`,
-                    top: `${(onCanvasTextPos.y / 255) * 100}%`,
+                    left: `${Math.max(16, Math.min(84, (onCanvasTextPos.x / 255) * 100))}%`,
+                    top: `${Math.max(16, Math.min(84, (onCanvasTextPos.y / 255) * 100))}%`,
                     transform: 'translate(-50%, -50%)',
-                    maxWidth: '92%',
+                    width: 'calc(100% - 24px)',
+                    maxWidth: '340px',
                   }}
                 >
-                  <div className="bg-white/95 backdrop-blur-xs border-2 border-black shadow-[4px_4px_0px_#000000] p-2 flex flex-col gap-1.5 min-w-[220px]">
+                  <div className="bg-white/95 backdrop-blur-md border-2 border-black shadow-[4px_4px_0px_#000000] p-2 flex flex-col gap-1.5 w-full">
+                    {/* Header */}
                     <div className="flex items-center justify-between text-[9px] font-pixel text-black font-bold pb-1 border-b border-black">
                       <span className="flex items-center gap-1">
                         <Type className="w-3 h-3 text-amber-600" />
@@ -556,13 +661,59 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                       </span>
                     </div>
 
+                    {/* Font Size & Presets Bar */}
+                    <div className="flex items-center justify-between gap-1 bg-amber-50 p-1 border border-black text-[9px] font-pixel">
+                      <span className="text-black font-bold flex items-center gap-0.5">
+                        <Sliders className="w-2.5 h-2.5 text-amber-700" /> Ukuran:
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleFontSizeChange(fontSize - 4)}
+                          disabled={fontSize <= 10}
+                          className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[9px] cursor-pointer disabled:opacity-40"
+                          title="Perkecil Ukuran"
+                        >
+                          -
+                        </button>
+                        <span className="font-mono font-bold text-black min-w-[32px] text-center text-[10px]">
+                          {fontSize}px
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleFontSizeChange(fontSize + 4)}
+                          disabled={fontSize >= 72}
+                          className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[9px] cursor-pointer disabled:opacity-40"
+                          title="Perbesar Ukuran"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        {[12, 18, 24, 32, 48].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => handleFontSizeChange(s)}
+                            className={`px-1 py-0.5 text-[8px] font-mono font-bold border border-black cursor-pointer transition-colors ${
+                              fontSize === s
+                                ? 'bg-[#fbbf24] text-black ring-1 ring-black'
+                                : 'bg-white text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Direct Textarea on canvas */}
                     <textarea
                       autoFocus
                       rows={3}
-                      placeholder="Ketik langsung di sini... (Shift+Enter: baris baru)"
+                      placeholder="Ketik langsung di sini... (Ctrl+Enter: Simpan)"
                       value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
+                      onChange={(e) => handleInputTextChange(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                           e.preventDefault();
@@ -575,36 +726,52 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                       style={{
                         color: brushColor,
                         fontFamily: getResolvedFont(fontFamily),
-                        fontSize: `${Math.max(11, fontSize)}px`,
+                        fontSize: `${Math.round(fontSize * scale)}px`,
+                        lineHeight: 1.3,
                         textAlign: textAlign,
                       }}
-                      className="w-full bg-slate-900/95 text-white p-2 border border-black focus:outline-none focus:ring-1 focus:ring-amber-400 font-bold placeholder-slate-400 text-xs resize-y"
+                      className="w-full bg-slate-900/95 text-white p-2 border border-black focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold placeholder-slate-400 resize-y max-h-[140px]"
                     />
 
-                    {/* Buttons: Commit / Cancel / Delete */}
+                    {/* Quick Color Palette & Actions inside floating editor */}
                     <div className="flex items-center justify-between gap-1 pt-0.5">
-                      {editingTextIndex !== null && (
+                      <div className="flex items-center gap-1">
+                        {COLOR_PRESETS.slice(0, 6).map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => handleTextColorChange(c)}
+                            className={`w-4 h-4 border border-black shadow-[1px_1px_0px_#000000] cursor-pointer transition-transform ${
+                              brushColor === c ? 'scale-125 ring-1 ring-black' : ''
+                            }`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-1">
+                        {editingTextIndex !== null && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTexts((prev) => prev.filter((_, i) => i !== editingTextIndex));
+                              setOnCanvasTextPos(null);
+                              setEditingTextIndex(null);
+                              setInputText('');
+                            }}
+                            className="px-1.5 py-1 bg-rose-500 hover:bg-rose-600 text-white font-pixel text-[8px] border border-black shadow-[1px_1px_0px_#000000] flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <Trash2 className="w-2.5 h-2.5" /> Hapus
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
-                            setTexts((prev) => prev.filter((_, i) => i !== editingTextIndex));
-                            setOnCanvasTextPos(null);
-                            setEditingTextIndex(null);
-                            setInputText('');
-                          }}
-                          className="px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white font-pixel text-[9px] border border-black shadow-[1px_1px_0px_#000000] flex items-center gap-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-2.5 h-2.5" /> Hapus
-                        </button>
-                      )}
-                      <div className="flex items-center gap-1 ml-auto">
-                        <button
-                          type="button"
-                          onClick={() => {
                             setOnCanvasTextPos(null);
                             setEditingTextIndex(null);
                           }}
-                          className="px-2 py-1 bg-white hover:bg-slate-100 text-black font-pixel text-[9px] border border-black shadow-[1px_1px_0px_#000000] cursor-pointer"
+                          className="px-2 py-1 bg-white hover:bg-slate-100 text-black font-pixel text-[8px] border border-black shadow-[1px_1px_0px_#000000] cursor-pointer"
                         >
                           Batal
                         </button>
@@ -734,52 +901,124 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
               <div className="flex flex-col gap-2.5 p-3 bg-slate-50 border-2 border-black shadow-[2px_2px_0px_#000000]">
                 <div className="flex items-center justify-between">
                   <span className="font-pixel text-[10px] text-black font-bold flex items-center gap-1">
-                    <Type className="w-3 h-3 text-amber-600" /> Teks Pesan (Multi-baris)
+                    <Type className="w-3 h-3 text-amber-600" /> Teks Pesan
                   </span>
                   <span className="text-[8px] font-pixel text-slate-500">
                     Klik kanvas untuk menulis
                   </span>
                 </div>
 
+                {editingTextIndex !== null && (
+                  <div className="flex items-center justify-between bg-amber-100 border border-black p-1.5 text-[9px] font-pixel">
+                    <span className="text-black font-bold flex items-center gap-1">
+                      <Edit3 className="w-3 h-3 text-amber-700" /> Edit Teks #{editingTextIndex + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOnCanvasTextPos(null);
+                        setEditingTextIndex(null);
+                        setInputText('');
+                      }}
+                      className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[8px] cursor-pointer"
+                    >
+                      Batal Edit
+                    </button>
+                  </div>
+                )}
+
                 {/* Multi-line Textarea */}
                 <textarea
                   rows={3}
                   placeholder="Ketik teks pesan Anda di sini...&#10;Mendukung multi-baris & teks panjang.&#10;Klik langsung di kanvas untuk menempatkan!"
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => handleInputTextChange(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border-2 border-black text-xs text-black font-mono placeholder-slate-400 focus:outline-none focus:bg-amber-50 shadow-[1px_1px_0px_#000000] resize-y"
                 />
 
-                {/* Typography Controls: Size & Font */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <label className="text-[9px] font-pixel text-slate-700 block mb-0.5">Ukuran Teks</label>
-                    <select
-                      value={fontSize}
-                      onChange={(e) => setFontSize(Number(e.target.value))}
-                      className="w-full px-1.5 py-1 bg-white border-2 border-black text-[11px] text-black font-mono shadow-[1px_1px_0px_#000000]"
-                    >
-                      <option value={10}>10px Mikro</option>
-                      <option value={14}>14px Kecil</option>
-                      <option value={18}>18px Sedang</option>
-                      <option value={24}>24px Besar</option>
-                      <option value={32}>32px Ekstra</option>
-                    </select>
+                {/* Typography Controls: Size with Slider & Presets */}
+                <div className="flex flex-col gap-1.5 p-2 bg-white border-2 border-black shadow-[1px_1px_0px_#000000]">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-pixel text-[9px] text-black font-bold flex items-center gap-1">
+                      <Sliders className="w-3 h-3 text-amber-600" /> Ukuran Teks:
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleFontSizeChange(fontSize - 2)}
+                        disabled={fontSize <= 10}
+                        className="w-5 h-5 flex items-center justify-center bg-slate-100 hover:bg-slate-200 border border-black font-bold text-xs cursor-pointer disabled:opacity-30"
+                        title="Perkecil Ukuran"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono text-xs font-bold text-amber-700 min-w-[34px] text-center">
+                        {fontSize}px
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleFontSizeChange(fontSize + 2)}
+                        disabled={fontSize >= 72}
+                        className="w-5 h-5 flex items-center justify-center bg-slate-100 hover:bg-slate-200 border border-black font-bold text-xs cursor-pointer disabled:opacity-30"
+                        title="Perbesar Ukuran"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[9px] font-pixel text-slate-700 block mb-0.5">Gaya Font</label>
-                    <select
-                      value={fontFamily}
-                      onChange={(e) => setFontFamily(e.target.value)}
-                      className="w-full px-1.5 py-1 bg-white border-2 border-black text-[11px] text-black font-mono shadow-[1px_1px_0px_#000000]"
-                    >
-                      <option value="pixel">Retro Pixel (Press Start)</option>
-                      <option value="vt323">Arcade Mono (VT323)</option>
-                      <option value="monospace">Clean Mono</option>
-                      <option value="sans-serif">Modern Sans</option>
-                      <option value="serif">Classic Serif</option>
-                    </select>
+
+                  {/* Range Slider for Font Size */}
+                  <input
+                    type="range"
+                    min="10"
+                    max="72"
+                    step="2"
+                    value={fontSize}
+                    onChange={(e) => handleFontSizeChange(Number(e.target.value))}
+                    className="w-full accent-black h-2 bg-slate-200 rounded-none cursor-pointer"
+                  />
+
+                  {/* Quick Preset Buttons */}
+                  <div className="grid grid-cols-5 gap-1 pt-0.5">
+                    {[
+                      { label: 'Mikro', size: 12 },
+                      { label: 'Kecil', size: 16 },
+                      { label: 'Sedang', size: 22 },
+                      { label: 'Besar', size: 32 },
+                      { label: 'Jumbo', size: 48 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.size}
+                        type="button"
+                        onClick={() => handleFontSizeChange(preset.size)}
+                        className={`py-0.5 px-1 border border-black font-pixel text-[8px] font-bold cursor-pointer transition-colors text-center ${
+                          fontSize === preset.size
+                            ? 'bg-[#fbbf24] text-black shadow-[1px_1px_0px_#000000]'
+                            : 'bg-white hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
+                </div>
+
+                {/* Font Family Selector */}
+                <div>
+                  <label className="text-[9px] font-pixel text-slate-700 block mb-0.5 font-bold">
+                    Gaya Font:
+                  </label>
+                  <select
+                    value={fontFamily}
+                    onChange={(e) => handleFontFamilyChange(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-white border-2 border-black text-xs text-black font-mono shadow-[1px_1px_0px_#000000]"
+                  >
+                    <option value="pixel">Retro Pixel (Press Start)</option>
+                    <option value="vt323">Arcade Mono (VT323)</option>
+                    <option value="monospace">Clean Mono</option>
+                    <option value="sans-serif">Modern Sans</option>
+                    <option value="serif">Classic Serif</option>
+                  </select>
                 </div>
 
                 {/* Alignment & Center Placement */}
@@ -788,7 +1027,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     <span className="text-[9px] font-pixel text-slate-600">Rata:</span>
                     <button
                       type="button"
-                      onClick={() => setTextAlign('left')}
+                      onClick={() => handleTextAlignChange('left')}
                       className={`p-1 border border-black shadow-[1px_1px_0px_#000000] cursor-pointer ${
                         textAlign === 'left' ? 'bg-[#fbbf24]' : 'bg-white'
                       }`}
@@ -798,7 +1037,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setTextAlign('center')}
+                      onClick={() => handleTextAlignChange('center')}
                       className={`p-1 border border-black shadow-[1px_1px_0px_#000000] cursor-pointer ${
                         textAlign === 'center' ? 'bg-[#fbbf24]' : 'bg-white'
                       }`}
@@ -808,7 +1047,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setTextAlign('right')}
+                      onClick={() => handleTextAlignChange('right')}
                       className={`p-1 border border-black shadow-[1px_1px_0px_#000000] cursor-pointer ${
                         textAlign === 'right' ? 'bg-[#fbbf24]' : 'bg-white'
                       }`}
@@ -839,7 +1078,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     {COLOR_PRESETS.map((c) => (
                       <button
                         key={c}
-                        onClick={() => setBrushColor(c)}
+                        onClick={() => handleTextColorChange(c)}
                         className={`w-6 h-6 border-2 border-black shadow-[1px_1px_0px_#000000] transition-transform ${
                           brushColor === c ? 'scale-115 ring-2 ring-black' : ''
                         }`}
@@ -849,7 +1088,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     <input
                       type="color"
                       value={brushColor}
-                      onChange={(e) => setBrushColor(e.target.value)}
+                      onChange={(e) => handleTextColorChange(e.target.value)}
                       title="Warna kustom"
                       className="w-6 h-6 border-2 border-black cursor-pointer bg-transparent p-0"
                     />
@@ -868,19 +1107,24 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                           key={idx}
                           className="flex items-center justify-between bg-white border border-black p-1 text-[10px] font-mono shadow-[1px_1px_0px_#000000]"
                         >
-                          <span
-                            className="truncate max-w-[130px] font-bold"
-                            style={{ color: t.color }}
-                          >
-                            {t.text.replace(/\n/g, ' ')}
-                          </span>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span
+                              className="truncate max-w-[110px] font-bold"
+                              style={{ color: t.color }}
+                            >
+                              {t.text.replace(/\n/g, ' ')}
+                            </span>
+                            <span className="text-[8px] bg-slate-100 border border-slate-300 px-1 py-0.2 text-slate-600 font-mono shrink-0">
+                              {t.size || 20}px
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
                               onClick={() => {
                                 setEditingTextIndex(idx);
                                 setInputText(t.text);
-                                setFontSize(t.size);
+                                setFontSize(t.size || 20);
                                 setFontFamily(t.font || 'pixel');
                                 setBrushColor(t.color);
                                 setTextAlign(t.align || 'center');
