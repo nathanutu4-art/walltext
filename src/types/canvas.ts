@@ -59,5 +59,5 @@ export const CANVAS_HEIGHT = 1080;
 export const CANVAS_SIZE = CANVAS_WIDTH; // Backwards compatible alias
 export const MICRO_LOD_THRESHOLD = 32; // Zoom >= 32px per cell triggers Micro LOD
 export const MIN_ZOOM = 2; // Min cell size in px
-export const MAX_ZOOM = 256; // Max cell size in px
+export const MAX_ZOOM = 768; // Max cell size in px (allows deep zoom to inspect details)
 export const NORMALIZED_COORD_SPACE = 256; // 0-255 normalized coordinate space inside each 1:1 cell

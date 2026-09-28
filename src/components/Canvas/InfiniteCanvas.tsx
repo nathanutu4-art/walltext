@@ -98,7 +98,7 @@ export const InfiniteCanvas: React.FC = () => {
       setViewport((prev) => {
         // If first initialization, center on origin
         if (prev.width === 0 && prev.height === 0) {
-          const initZoom = 52;
+          const initZoom = 64;
           const initOffsetX = w / 2 - (INITIAL_SPAWN_X + 0.5) * initZoom;
           const initOffsetY = h / 2 - (INITIAL_SPAWN_Y + 0.5) * initZoom;
           return {
@@ -118,6 +118,15 @@ export const InfiniteCanvas: React.FC = () => {
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
+  }, [requestRepaint]);
+
+  // Repaint once fonts have finished loading
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(() => {
+        requestRepaint();
+      });
+    }
   }, [requestRepaint]);
 
   // Load and subscribe to cells

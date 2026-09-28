@@ -301,18 +301,19 @@ export class CanvasRenderer {
       for (const textItem of cell.vector_data.texts) {
         if (!textItem || !textItem.text) continue;
 
-        const fontSize = Math.max(2, (textItem.size || 20) * scale);
+        const rawFontSize = (textItem.size || 22) * scale;
+        const fontSize = Math.max(5, rawFontSize);
         const fontFace = textItem.font === 'pixel'
-          ? 'var(--font-pixel), monospace'
+          ? '"Press Start 2P", monospace'
           : textItem.font === 'vt323'
-          ? 'var(--font-mono-pixel), monospace'
+          ? '"VT323", monospace'
           : textItem.font === 'monospace'
           ? 'monospace'
           : textItem.font === 'serif'
           ? 'serif'
           : textItem.font || 'sans-serif';
 
-        ctx.font = `700 ${fontSize}px ${fontFace}, system-ui`;
+        ctx.font = `700 ${fontSize}px ${fontFace}`;
         ctx.fillStyle = textItem.color || '#000000';
         ctx.textAlign = textItem.align || 'center';
         ctx.textBaseline = 'middle';
@@ -331,8 +332,8 @@ export class CanvasRenderer {
       }
     } else if (cell.message_text) {
       // Fallback for legacy or text-only cells
-      const fontSize = Math.max(2, 20 * scale);
-      ctx.font = `700 ${fontSize}px var(--font-pixel), monospace`;
+      const fontSize = Math.max(5, 22 * scale);
+      ctx.font = `700 ${fontSize}px "Press Start 2P", monospace`;
       ctx.fillStyle = '#000000';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';

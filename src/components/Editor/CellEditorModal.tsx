@@ -93,8 +93,8 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
   const scale = CANVAS_DISPLAY_SIZE / NORMALIZED_COORD_SPACE; // ~1.5
 
   const getResolvedFont = useCallback((font?: string) => {
-    if (font === 'pixel') return 'var(--font-pixel), monospace';
-    if (font === 'vt323') return 'var(--font-mono-pixel), monospace';
+    if (font === 'pixel') return '"Press Start 2P", monospace';
+    if (font === 'vt323') return '"VT323", monospace';
     if (font === 'monospace') return 'monospace';
     if (font === 'serif') return 'serif';
     return font || 'sans-serif';
@@ -102,7 +102,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
 
   // Synchronized text property updates for real-time reactivity
   const handleFontSizeChange = useCallback((newSize: number) => {
-    const clamped = Math.max(10, Math.min(72, newSize));
+    const clamped = Math.max(10, Math.min(100, newSize));
     setFontSize(clamped);
     if (editingTextIndex !== null) {
       setTexts((prev) => {
@@ -301,9 +301,9 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       const textItem = texts[idx];
       if (!textItem || !textItem.text) continue;
 
-      const fSize = Math.max(8, (textItem.size || 20) * scale);
+      const fSize = Math.max(8, (textItem.size || 22) * scale);
       const fFace = getResolvedFont(textItem.font);
-      ctx.font = `700 ${fSize}px ${fFace}, system-ui`;
+      ctx.font = `700 ${fSize}px ${fFace}`;
       ctx.fillStyle = textItem.color || '#ffffff';
       ctx.textAlign = textItem.align || 'center';
       ctx.textBaseline = 'middle';
@@ -352,7 +352,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       ctx.globalAlpha = 0.65;
       const fSize = Math.max(8, fontSize * scale);
       const fFace = getResolvedFont(fontFamily);
-      ctx.font = `700 ${fSize}px ${fFace}, system-ui`;
+      ctx.font = `700 ${fSize}px ${fFace}`;
       ctx.fillStyle = brushColor;
       ctx.textAlign = textAlign;
       ctx.textBaseline = 'middle';
@@ -682,7 +682,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleFontSizeChange(fontSize + 4)}
-                          disabled={fontSize >= 72}
+                          disabled={fontSize >= 100}
                           className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[9px] cursor-pointer disabled:opacity-40"
                           title="Perbesar Ukuran"
                         >
@@ -690,7 +690,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                         </button>
                       </div>
                       <div className="flex items-center gap-0.5">
-                        {[12, 18, 24, 32, 48].map((s) => (
+                        {[14, 22, 34, 52, 76].map((s) => (
                           <button
                             key={s}
                             type="button"
@@ -958,7 +958,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleFontSizeChange(fontSize + 2)}
-                        disabled={fontSize >= 72}
+                        disabled={fontSize >= 100}
                         className="w-5 h-5 flex items-center justify-center bg-slate-100 hover:bg-slate-200 border border-black font-bold text-xs cursor-pointer disabled:opacity-30"
                         title="Perbesar Ukuran"
                       >
@@ -971,7 +971,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                   <input
                     type="range"
                     min="10"
-                    max="72"
+                    max="100"
                     step="2"
                     value={fontSize}
                     onChange={(e) => handleFontSizeChange(Number(e.target.value))}
@@ -981,11 +981,11 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                   {/* Quick Preset Buttons */}
                   <div className="grid grid-cols-5 gap-1 pt-0.5">
                     {[
-                      { label: 'Mikro', size: 12 },
-                      { label: 'Kecil', size: 16 },
+                      { label: 'Kecil', size: 14 },
                       { label: 'Sedang', size: 22 },
-                      { label: 'Besar', size: 32 },
-                      { label: 'Jumbo', size: 48 },
+                      { label: 'Besar', size: 34 },
+                      { label: 'Jumbo', size: 52 },
+                      { label: 'Raksasa', size: 76 },
                     ].map((preset) => (
                       <button
                         key={preset.size}
