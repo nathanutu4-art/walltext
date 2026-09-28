@@ -34,24 +34,24 @@ interface CellEditorModalProps {
 }
 
 const BG_PRESETS = [
+  { name: 'Crisp White', color: '#ffffff' },
   { name: 'Cosmic Dark', color: '#0f172a' },
   { name: 'Midnight', color: '#020617' },
   { name: 'Cyber Green', color: '#022c22' },
   { name: 'Deep Purple', color: '#1e1035' },
   { name: 'Warm Noir', color: '#1c1917' },
   { name: 'Crimson Night', color: '#2b0914' },
-  { name: 'Crisp White', color: '#f8fafc' },
 ];
 
 const COLOR_PRESETS = [
+  '#000000',
   '#ffffff',
-  '#38bdf8', // cyan
-  '#34d399', // emerald
-  '#f43f5e', // rose
   '#fbbf24', // amber
+  '#f43f5e', // rose
+  '#34d399', // emerald
+  '#38bdf8', // cyan
   '#c084fc', // purple
   '#fb923c', // orange
-  '#0f172a', // dark
 ];
 
 export const CellEditorModal: React.FC<CellEditorModalProps> = ({
@@ -63,9 +63,9 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
 
   // Tools state
   const [activeTool, setActiveTool] = useState<'brush' | 'text' | 'eraser'>('brush');
-  const [brushColor, setBrushColor] = useState<string>('#38bdf8');
+  const [brushColor, setBrushColor] = useState<string>('#000000');
   const [brushWidth, setBrushWidth] = useState<number>(4);
-  const [bgColor, setBgColor] = useState<string>('#0f172a');
+  const [bgColor, setBgColor] = useState<string>('#ffffff');
 
   // Vector data
   const [strokes, setStrokes] = useState<CanvasStroke[]>([]);
@@ -85,7 +85,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
   // Metadata inputs
   const [messageCaption, setMessageCaption] = useState<string>('');
   const [authorName, setAuthorName] = useState<string>('');
-  const [dominantColor, setDominantColor] = useState<string>('#38bdf8');
+  const [dominantColor, setDominantColor] = useState<string>('#ffffff');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -409,15 +409,45 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // Update macro dominant color candidate whenever colors change
+  // Dynamically compute the true dominant color (warna terbanyak pada canvas)
   useEffect(() => {
-    const valid = strokes.filter((s) => s && s.color);
-    if (valid.length > 0) {
-      setDominantColor(valid[valid.length - 1].color);
-    } else {
-      setDominantColor(bgColor === '#0f172a' ? '#38bdf8' : bgColor);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    try {
+      const w = CANVAS_DISPLAY_SIZE;
+      const h = CANVAS_DISPLAY_SIZE;
+      const imgData = ctx.getImageData(0, 0, w, h).data;
+      const counts: Record<string, number> = {};
+      const step = 6; // Sample every 6th pixel (64x64 samples = 4096 samples, execution < 0.3ms)
+
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          const idx = (y * w + x) * 4;
+          if (imgData[idx + 3] < 128) continue;
+          const r = imgData[idx];
+          const g = imgData[idx + 1];
+          const b = imgData[idx + 2];
+          const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+          counts[hex] = (counts[hex] || 0) + 1;
+        }
+      }
+
+      let topColor = bgColor;
+      let maxCount = -1;
+      for (const [col, count] of Object.entries(counts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          topColor = col;
+        }
+      }
+      setDominantColor(topColor);
+    } catch {
+      setDominantColor(bgColor);
     }
-  }, [strokes, bgColor]);
+  }, [strokes, texts, bgColor]);
 
   // Pointer event coordinate mapping (Normalized 0..255)
   const getNormalizedPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -796,12 +826,13 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
             {/* Canvas Actions below canvas */}
             <div className="flex items-center justify-between w-full max-w-[360px] px-1 text-xs">
               <div className="flex items-center gap-1.5">
-                <span className="font-pixel text-[10px] text-slate-700">MAKRO:</span>
+                <span className="font-pixel text-[10px] text-slate-700 font-bold">MAKRO:</span>
                 <span
-                  className="w-4 h-4 border-2 border-black shadow-[1px_1px_0px_#000000] inline-block align-middle"
+                  className="w-4 h-4 border-2 border-black shadow-[1px_1px_0px_#000000] inline-block align-middle transition-colors"
                   style={{ backgroundColor: dominantColor }}
-                  title="Warna dominan yang tampil saat zoom Makro"
+                  title={`Warna dominan Makro: ${dominantColor}`}
                 />
+                <span className="font-mono text-[9px] text-slate-600 font-bold uppercase">{dominantColor}</span>
               </div>
               <button
                 onClick={handleReset}

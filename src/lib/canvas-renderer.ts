@@ -221,6 +221,76 @@ export class CanvasRenderer {
   }
 
   /**
+   * Calculate the true dominant color of a cell (warna terbanyak pada canvas).
+   * Analyzes background, strokes, and texts area weights.
+   */
+  public static getCellDominantColor(cell: CanvasCell): string {
+    if (cell.vector_data) {
+      const bg = cell.vector_data.bg || '#ffffff';
+      const strokes = cell.vector_data.strokes || [];
+      const texts = cell.vector_data.texts || [];
+
+      if (strokes.length === 0 && texts.length === 0) {
+        return bg;
+      }
+
+      // Track area in 256x256 space (total 65536 units)
+      const colorAreas: Record<string, number> = {};
+      const totalArea = 256 * 256;
+      let drawnArea = 0;
+
+      // Strokes area estimation
+      for (const stroke of strokes) {
+        if (!stroke || !stroke.points || stroke.points.length === 0) continue;
+        const color = stroke.color || '#000000';
+        const w = stroke.width || 4;
+        let len = 0;
+        if (stroke.points.length === 1) {
+          len = w;
+        } else {
+          for (let i = 1; i < stroke.points.length; i++) {
+            const p1 = stroke.points[i - 1];
+            const p2 = stroke.points[i];
+            if (p1 && p2) {
+              len += Math.hypot(p2.x - p1.x, p2.y - p1.y);
+            }
+          }
+        }
+        const strokeArea = len * w;
+        colorAreas[color] = (colorAreas[color] || 0) + strokeArea;
+        drawnArea += strokeArea;
+      }
+
+      // Texts area estimation
+      for (const t of texts) {
+        if (!t || !t.text) continue;
+        const color = t.color || '#000000';
+        const sz = t.size || 20;
+        const textLen = t.text.replace(/\s/g, '').length;
+        const textArea = textLen * sz * sz * 0.45;
+        colorAreas[color] = (colorAreas[color] || 0) + textArea;
+        drawnArea += textArea;
+      }
+
+      // Remaining area is filled by the background color
+      const remainingBg = Math.max(0, totalArea - drawnArea);
+      colorAreas[bg] = (colorAreas[bg] || 0) + remainingBg;
+
+      let topColor = bg;
+      let maxArea = -1;
+      for (const [col, area] of Object.entries(colorAreas)) {
+        if (area > maxArea) {
+          maxArea = area;
+          topColor = col;
+        }
+      }
+      return topColor;
+    }
+
+    return cell.dominant_color || '#fbbf24';
+  }
+
+  /**
    * Mode Makro: Render 1 solid dominant color block with retro pixel border
    */
   private static renderMacroCell(
@@ -230,7 +300,8 @@ export class CanvasRenderer {
     screenY: number,
     cellSize: number
   ) {
-    ctx.fillStyle = cell.dominant_color || '#fbbf24';
+    const dominantColor = this.getCellDominantColor(cell);
+    ctx.fillStyle = dominantColor;
     ctx.fillRect(screenX, screenY, cellSize, cellSize);
 
     // Solid outline if size is moderately visible
