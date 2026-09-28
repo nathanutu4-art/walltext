@@ -14,7 +14,6 @@ import {
 import { CanvasRenderer } from '@/lib/canvas-renderer';
 import { canvasStorage } from '@/lib/storage';
 import { INITIAL_SPAWN_X, INITIAL_SPAWN_Y } from '@/lib/seed-data';
-import { CoordinateHud } from './CoordinateHud';
 import { ControlsOverlay } from './ControlsOverlay';
 import { CanvasMinimap } from './CanvasMinimap';
 import { CellInspectorModal } from './CellInspectorModal';
@@ -446,7 +445,7 @@ export const InfiniteCanvas: React.FC = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-white select-none">
-      {/* Top Navbar */}
+      {/* Top Navbar & Info Bar (Single 1 Row) */}
       <Navbar
         onOpenCreate={() => {
           const target = selectedCell || hoveredCell || { x: INITIAL_SPAWN_X, y: INITIAL_SPAWN_Y };
@@ -456,11 +455,6 @@ export const InfiniteCanvas: React.FC = () => {
         onOpenHelp={() => setIsHelpOpen(true)}
         onResetView={(x, y) => centerOnCell(x ?? INITIAL_SPAWN_X, y ?? INITIAL_SPAWN_Y, 52)}
         selectedCell={selectedCell}
-        totalClaimed={totalClaimed}
-      />
-
-      {/* Coordinate & LOD HUD */}
-      <CoordinateHud
         cursorCell={hoveredCell}
         cellSize={viewport.cellSize}
         lodMode={lodMode}

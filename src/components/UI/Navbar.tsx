@@ -1,13 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Home,
   HelpCircle,
   Search,
   PlusCircle,
   Tv,
+  Eye,
+  Layers,
+  Copy,
+  Check,
+  Radio,
 } from 'lucide-react';
+import { LodMode, MICRO_LOD_THRESHOLD } from '@/types/canvas';
 import { INITIAL_SPAWN_X, INITIAL_SPAWN_Y } from '@/lib/seed-data';
 
 interface NavbarProps {
@@ -16,6 +22,10 @@ interface NavbarProps {
   onOpenHelp: () => void;
   onResetView?: (x: number, y: number) => void;
   selectedCell: { x: number; y: number } | null;
+  cursorCell: { x: number; y: number } | null;
+  cellSize: number;
+  lodMode: LodMode;
+  isLive: boolean;
   totalClaimed: number;
 }
 
@@ -25,69 +35,126 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenHelp,
   onResetView,
   selectedCell,
+  cursorCell,
+  cellSize,
+  lodMode,
+  isLive,
   totalClaimed,
 }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (!cursorCell) return;
+    const text = `${cursorCell.x}, ${cursorCell.y}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const zoomPercent = Math.round((cellSize / MICRO_LOD_THRESHOLD) * 100);
+
   return (
-    <header className="absolute top-0 left-0 right-0 z-30 pointer-events-none p-3 sm:p-5 flex items-center justify-between">
-      {/* Brand: Retro Computer Monitor Icon + PixelCraft Title */}
-      <div className="pointer-events-auto flex items-center gap-2.5 bg-white border-2 border-black px-3.5 py-2 shadow-[3px_3px_0px_#000000]">
-        {/* Pixel Monitor Icon */}
-        <div className="w-6 h-6 bg-[#fbbf24] border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000000]">
-          <Tv className="w-3.5 h-3.5 text-black" />
-        </div>
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <span className="font-pixel text-xs sm:text-sm font-bold tracking-wider text-black">
-              PixelCraft
-            </span>
+    <header className="absolute top-0 left-0 right-0 z-30 pointer-events-none p-2 sm:p-3.5 flex items-center justify-between gap-2 overflow-x-hidden">
+      {/* Left Info Group (1 Single Compact Row: Logo + POS + LOD + Slot Count) */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Compact PixelCraft Logo */}
+        <div className="pointer-events-auto flex items-center gap-1.5 bg-white border-2 border-black px-2 py-1 shadow-[2px_2px_0px_#000000]">
+          <div className="w-4 h-4 bg-[#fbbf24] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000000]">
+            <Tv className="w-2.5 h-2.5 text-black" />
           </div>
-          <span className="text-[10px] font-mono text-slate-600 hidden sm:inline">
-            Infinite Message Canvas &bull; {totalClaimed} karya
+          <span className="font-pixel text-[10px] sm:text-xs font-bold tracking-wider text-black">
+            PixelCraft
           </span>
+        </div>
+
+        {/* POS Coordinate Box */}
+        <div className="pointer-events-auto flex items-center gap-1 px-2 py-1 bg-white border-2 border-black text-black text-xs font-mono shadow-[2px_2px_0px_#000000]">
+          <span className="bg-[#fbbf24] px-1 py-0.2 border border-black text-[8px] font-pixel font-bold">
+            POS
+          </span>
+          <span className="font-pixel text-[9px] sm:text-[10px] font-bold">
+            {cursorCell ? `X:${cursorCell.x} Y:${cursorCell.y}` : 'X:--- Y:---'}
+          </span>
+          {cursorCell && (
+            <button
+              onClick={handleCopy}
+              title="Salin Koordinat"
+              className="p-0.5 hover:bg-slate-200 transition-colors text-black cursor-pointer"
+            >
+              {copied ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
+            </button>
+          )}
+        </div>
+
+        {/* LOD Mode Badge */}
+        <div
+          className={`pointer-events-auto hidden md:flex items-center gap-1 px-2 py-1 border-2 border-black text-[9px] font-pixel font-bold shadow-[2px_2px_0px_#000000] ${
+            lodMode === 'micro'
+              ? 'bg-[#fbbf24] text-black'
+              : 'bg-white text-black'
+          }`}
+        >
+          {lodMode === 'micro' ? (
+            <>
+              <Eye className="w-3 h-3 text-black" />
+              <span>MIKRO</span>
+            </>
+          ) : (
+            <>
+              <Layers className="w-3 h-3 text-black" />
+              <span>MAKRO ({zoomPercent}%)</span>
+            </>
+          )}
+        </div>
+
+        {/* Claimed Slots Count Badge */}
+        <div className="pointer-events-auto hidden sm:flex items-center gap-1 px-2 py-1 bg-[#f87171] text-white border-2 border-black text-[9px] font-pixel font-bold shadow-[2px_2px_0px_#000000]">
+          <Radio className={`w-2.5 h-2.5 ${isLive ? 'text-yellow-200 animate-pulse' : 'text-white'}`} />
+          <span>{totalClaimed.toLocaleString()} Slot</span>
         </div>
       </div>
 
-      {/* Right Navigation Group (Exactly matching the Reference Image) */}
-      <div className="pointer-events-auto flex items-center -space-x-[2px] shadow-[3px_3px_0px_#000000]">
-        {/* Home Button (Active / Yellow style from reference) */}
+      {/* Right Navigation Group */}
+      <div className="pointer-events-auto flex items-center -space-x-[2px] shadow-[2px_2px_0px_#000000]">
+        {/* Home Button */}
         <button
           onClick={() => onResetView && onResetView(INITIAL_SPAWN_X, INITIAL_SPAWN_Y)}
           title="Ke Pusat Canvas (Home)"
-          className="flex items-center gap-1.5 px-3 py-2 bg-[#fbbf24] hover:bg-[#f59e0b] text-black border-2 border-black font-pixel text-[11px] font-bold transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 bg-[#fbbf24] hover:bg-[#f59e0b] text-black border-2 border-black font-pixel text-[10px] font-bold transition-colors cursor-pointer"
         >
-          <Home className="w-3.5 h-3.5" />
+          <Home className="w-3 h-3" />
           <span className="hidden md:inline">Home</span>
         </button>
 
-        {/* Claim / Create Button (Works) */}
+        {/* Claim / Create Button */}
         <button
           onClick={onOpenCreate}
           title="Klaim Slot / Buat Karya Baru"
-          className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[11px] font-bold transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[10px] font-bold transition-colors cursor-pointer"
         >
-          <PlusCircle className="w-3.5 h-3.5 text-amber-600" />
+          <PlusCircle className="w-3 h-3 text-amber-600" />
           <span className="hidden sm:inline">
             {selectedCell ? `Klaim (${selectedCell.x}, ${selectedCell.y})` : 'Klaim'}
           </span>
         </button>
 
-        {/* Teleport / Search Button (Blog / Search) */}
+        {/* Teleport / Search Button */}
         <button
           onClick={onOpenSearch}
           title="Cari Pesan atau Teleport Koordinat"
-          className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[11px] font-bold transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[10px] font-bold transition-colors cursor-pointer"
         >
-          <Search className="w-3.5 h-3.5" />
+          <Search className="w-3 h-3" />
           <span className="hidden md:inline">Teleport</span>
         </button>
 
-        {/* Help / Guide Button (About) */}
+        {/* Help / Guide Button */}
         <button
           onClick={onOpenHelp}
           title="Panduan Aplikasi"
-          className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[11px] font-bold transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[10px] font-bold transition-colors cursor-pointer"
         >
-          <HelpCircle className="w-3.5 h-3.5" />
+          <HelpCircle className="w-3 h-3" />
           <span className="hidden md:inline">About</span>
         </button>
       </div>
