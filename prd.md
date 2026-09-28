@@ -1,0 +1,112 @@
+# Product Requirement Document (PRD)
+
+| Metadata | Detail |
+| :--- | :--- |
+| **Nama Produk** | **PixelVerse / Infinite Message Canvas** *(Working Title)* |
+| **Versi Dokumen** | v1.0 |
+| **Status** | Ready for Development |
+| **Target Rilis** | MVP (Minimum Viable Product) |
+| **Platform** | Web (Desktop & Mobile Browser) |
+
+---
+
+## 1. Executive Summary & Vision
+
+### 1.1 Latar Belakang
+Aplikasi berbasis kanvas kolaboratif seperti *r/place* membuktikan tingginya keterlibatan pengguna dalam menciptakan karya kolektif. Namun, pada *r/place*, 1 piksel hanya mewakili satu titik warna statis tanpa kedalaman narasi atau ruang berekspresi yang lebih luas.
+
+### 1.2 Visi Produk
+Menciptakan kanvas publik kolaboratif berskala Full HD ($1920 \times 1080$ koordinat atau 2.073.600 slot) di mana setiap **1 piksel pada tampilan makro (jauh) adalah sebuah dunia mikro (dekat)** berupa halaman rasio 1:1 berisi pesan teks atau karya coretan tangan digital.
+
+### 1.3 Target Pengguna
+- **Kreator & Doodler:** Ingin menggambar karya seni mikro atau berkontribusi pada mural komunal.
+- **Komunitas & Netizen:** Ingin meninggalkan pesan, kapsul waktu (*time capsule*), kutipan inspiratif, atau sapaan publik/anonim.
+- **Penjelajah Digital:** Menikmati eksplorasi peta acak untuk menemukan pesan tersembunyi yang ditinggalkan orang lain.
+
+---
+
+## 2. Sasaran Produk (Product Goals & OKRs)
+
+1. **Efisiensi Penyimpanan:** Menggunakan format data vektor ringkas ($\le 1\text{ KB}$ per slot) agar 1 juta karya dapat ditampung dalam penyimpanan database $< 500\text{ MB}$.
+2. **Performa Rendering:** Viewport mampu melakukan navigasi (pan & zoom) pada kecepatan 60 FPS tanpa browser crash atau lag memori.
+3. **Keterlibatan Pengguna:** Memungkinkan karya pengguna baru muncul seketika (*live update*) di layar penjelajah lain tanpa refresh halaman melalui koneksi Realtime.
+
+---
+
+## 3. Fitur Utama & Spesifikasi Fungsional
+
+### 3.1 Dual-View Infinite Viewport (Mesin Kanvas Utama)
+Sistem memiliki 2 mode representasi visual bergantung pada tingkat perbesaran (*Level of Detail / LOD*):
+- **Mode Makro ($Zoom < 32\text{px}$ per sel):**
+  - Tiap slot koordinat yang terisi dirender sebagai **1 blok warna dominan** (`dominant_color`).
+  - Kanvas kosong menampilkan grid garis redup.
+- **Mode Mikro ($Zoom \ge 32\text{px}$ per sel):**
+  - Seluruh teks dan goresan brush dirender ulang secara tajam berbasis vektor via Native 2D Canvas context.
+  - Teks pesan dapat dibaca jelas tanpa pixelation.
+
+### 3.2 Navigasi & Eksplorasi
+- **Pan Kamera:** Geser layar dengan klik-kiri + drag (desktop) atau touch-and-drag (mobile).
+- **Zoom Kamera:** Scroll wheel (desktop) atau pinch-to-zoom (mobile) dengan rentang perbesaran $1\text{x}$ hingga $128\text{x}$.
+- **Dynamic Viewport Culling:** Hanya mengambil data sel yang berada di dalam area tampak (*bounding box*) layar saat pergerakan berhenti (debounced 150ms).
+- **Coordinate HUD:** Menampilkan posisi koordinat aktif $(X, Y)$, tingkat zoom, dan indikator mode (Makro/Mikro) di sudut layar.
+
+### 3.3 Editor Halaman 1:1 (Modal Input)
+Mekanisme pembuatan pesan/gambar saat pengguna mengklik koordinat yang kosong:
+- **Brush Tool:** Menggambar bebas dengan pilihan ketebalan ($1 - 10\text{ px}$) dan palet warna dasar.
+- **Text Tool:** Form input untuk mengetik teks, memilih ukuran font, dan menempelkannya ke koordinat kanvas modal.
+- **Eraser & Reset:** Menghapus goresan tertentu atau mengosongkan kanvas editor.
+- **Background Selector:** Pilihan warna latar halaman 1:1.
+- **Koordinat Normalisasi:** Seluruh titik koordinat goresan dan teks otomatis dinormalisasi ke skala integer internal $0 - 255$.
+- **Kalkulasi Warna Makro:** Sistem otomatis menentukan warna representasi makro dari warna latar belakang atau goresan pertama saat karya disimpan.
+
+### 3.4 Live Sync (Realtime Collaboration)
+- Menggunakan Supabase Realtime CDC (*Change Data Capture*).
+- Setiap kali ada baris data baru dimasukkan ke tabel, sel langsung terinjeksi ke memori viewport aktif pengguna lain tanpa *full re-fetch*.
+
+---
+
+## 4. Spesifikasi Teknis & Skema Data
+
+### 4.1 Tech Stack
+- **Frontend:** Next.js (App Router, TypeScript, Tailwind CSS).
+- **Rendering & Editor:** Native HTML5 Canvas 2D API (tanpa dependensi berat eksternal).
+- **Database & BaaS:** Supabase (PostgreSQL, Row Level Security, Realtime).
+- **Icons:** Lucide React.
+
+### 4.2 Skema Database PostgreSQL
+
+```sql
+CREATE TABLE canvas_cells (
+    x SMALLINT NOT NULL CHECK (x >= 0 AND x < 1920),
+    y SMALLINT NOT NULL CHECK (y >= 0 AND y < 1080),
+    dominant_color CHAR(7) NOT NULL,
+    vector_data JSONB NOT NULL,
+    message_text TEXT,
+    author_id UUID REFERENCES auth.users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (x, y)
+);
+
+-- Indeks komposit spasial untuk query cepat per layar
+CREATE INDEX idx_canvas_cells_viewport ON canvas_cells (x, y);
+
+-- Indeks pencarian teks
+CREATE INDEX idx_canvas_cells_fts ON canvas_cells USING gin(to_tsvector('simple', coalesce(message_text, '')));
+
+-- Row Level Security
+ALTER TABLE canvas_cells ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public Read Access" 
+ON canvas_cells FOR SELECT 
+USING (true);
+
+CREATE POLICY "Insert Once Policy" 
+ON canvas_cells FOR INSERT 
+WITH CHECK (
+    NOT EXISTS (
+        SELECT 1 FROM canvas_cells existing 
+        WHERE existing.x = canvas_cells.x AND existing.y = canvas_cells.y
+    )
+);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE canvas_cells;
