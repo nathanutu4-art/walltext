@@ -313,12 +313,13 @@ export class CanvasRenderer {
   /**
    * Mode Mikro: Sharp vector rendering with retro styling
    */
-  private static renderMicroCell(
+  public static renderMicroCell(
     ctx: CanvasRenderingContext2D,
     cell: CanvasCell,
     screenX: number,
     screenY: number,
-    cellSize: number
+    cellSize: number,
+    renderBorder: boolean = true
   ) {
     ctx.save();
 
@@ -371,7 +372,7 @@ export class CanvasRenderer {
         if (!textItem || !textItem.text) continue;
 
         const rawFontSize = (textItem.size || 22) * scale;
-        const fontSize = Math.max(5, rawFontSize);
+        const fontSize = Math.max(6, rawFontSize);
         const fontFace = textItem.font === 'pixel'
           ? '"Press Start 2P", monospace'
           : textItem.font === 'vt323'
@@ -401,9 +402,16 @@ export class CanvasRenderer {
       }
     } else if (cell.message_text) {
       // Fallback for legacy or text-only cells
-      const fontSize = Math.max(5, 22 * scale);
+      const fontSize = Math.max(6, 22 * scale);
       ctx.font = `700 ${fontSize}px "Press Start 2P", monospace`;
-      ctx.fillStyle = '#000000';
+      const isDarkBg =
+        cell.vector_data?.bg === '#0f172a' ||
+        cell.vector_data?.bg === '#020617' ||
+        cell.vector_data?.bg === '#1e1035' ||
+        cell.vector_data?.bg === '#1c1917' ||
+        cell.vector_data?.bg === '#2b0914' ||
+        cell.vector_data?.bg === '#022c22';
+      ctx.fillStyle = isDarkBg ? '#ffffff' : '#000000';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -420,9 +428,11 @@ export class CanvasRenderer {
     ctx.restore();
 
     // 5. Solid black border around micro cell
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(screenX, screenY, cellSize, cellSize);
+    if (renderBorder) {
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(screenX, screenY, cellSize, cellSize);
+    }
   }
 
   /**

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { CanvasCell, NORMALIZED_COORD_SPACE } from '@/types/canvas';
+import { CanvasCell } from '@/types/canvas';
+import { CanvasRenderer } from '@/lib/canvas-renderer';
 import { X, User, Calendar, MapPin, Share2, Check, ZoomIn, Sparkles } from 'lucide-react';
 
 interface CellInspectorModalProps {
@@ -21,54 +22,24 @@ export const CellInspectorModal: React.FC<CellInspectorModalProps> = ({
   const [copied, setCopied] = React.useState(false);
 
   useEffect(() => {
-    const canvas = previewCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const renderPreview = () => {
+      const canvas = previewCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const size = canvas.width;
-    ctx.clearRect(0, 0, size, size);
+      const size = canvas.width;
+      ctx.clearRect(0, 0, size, size);
 
-    // Background
-    ctx.fillStyle = cell.vector_data?.bg || '#ffffff';
-    ctx.fillRect(0, 0, size, size);
+      // Render 1:1 vector cell matching editor and canvas view
+      CanvasRenderer.renderMicroCell(ctx, cell, 0, 0, size, false);
+    };
 
-    const scale = size / NORMALIZED_COORD_SPACE;
+    renderPreview();
 
-    // Render strokes safely
-    if (cell.vector_data?.strokes) {
-      for (const stroke of cell.vector_data.strokes) {
-        if (!stroke || !stroke.points || stroke.points.length === 0) continue;
-        ctx.beginPath();
-        ctx.strokeStyle = stroke.color || '#000000';
-        ctx.lineWidth = Math.max(1, (stroke.width || 4) * scale);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        const first = stroke.points[0];
-        if (!first) continue;
-        ctx.moveTo(first.x * scale, first.y * scale);
-        for (let i = 1; i < stroke.points.length; i++) {
-          const pt = stroke.points[i];
-          if (pt) {
-            ctx.lineTo(pt.x * scale, pt.y * scale);
-          }
-        }
-        ctx.stroke();
-      }
-    }
-
-    // Render texts
-    if (cell.vector_data?.texts) {
-      for (const textItem of cell.vector_data.texts) {
-        if (!textItem || !textItem.text) continue;
-        const fontSize = Math.max(12, (textItem.size || 18) * scale);
-        ctx.font = `700 ${fontSize}px var(--font-pixel), monospace`;
-        ctx.fillStyle = textItem.color || '#000000';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(textItem.text, (textItem.x || 0) * scale, (textItem.y || 0) * scale);
-      }
+    // Re-render when fonts are loaded
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(renderPreview);
     }
   }, [cell]);
 
@@ -87,6 +58,8 @@ export const CellInspectorModal: React.FC<CellInspectorModalProps> = ({
       })
     : 'Baru saja';
 
+  const dominantColor = CanvasRenderer.getCellDominantColor(cell);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div className="relative w-full max-w-md bg-white border-3 border-black shadow-[8px_8px_0px_#000000] text-black flex flex-col overflow-hidden">
@@ -95,7 +68,7 @@ export const CellInspectorModal: React.FC<CellInspectorModalProps> = ({
           <div className="flex items-center gap-2">
             <span
               className="w-3.5 h-3.5 border-2 border-black shadow-[1px_1px_0px_#000000]"
-              style={{ backgroundColor: cell.dominant_color }}
+              style={{ backgroundColor: dominantColor }}
             />
             <h3 className="font-pixel text-xs font-bold text-black flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-black" />

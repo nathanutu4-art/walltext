@@ -505,7 +505,7 @@ export const InfiniteCanvas: React.FC = () => {
           cell={inspectedCell}
           onClose={() => setInspectedCell(null)}
           onZoomIntoCell={(x, y) => {
-            centerOnCell(x, y, 96);
+            centerOnCell(x, y, 256);
             setInspectedCell(null);
           }}
           onClaimNeighbor={(nx, ny) => {
@@ -528,7 +528,7 @@ export const InfiniteCanvas: React.FC = () => {
               const count = await canvasStorage.fetchTotalClaimedCount();
               setTotalClaimed(count);
               setSelectedCell({ x: newCell.x, y: newCell.y });
-              centerOnCell(newCell.x, newCell.y, 64);
+              centerOnCell(newCell.x, newCell.y, 256);
               requestRepaint();
             }
             return res;
@@ -541,7 +541,7 @@ export const InfiniteCanvas: React.FC = () => {
         <TeleportSearchModal
           onClose={() => setIsSearchOpen(false)}
           onTeleport={(x, y) => {
-            centerOnCell(x, y, 64);
+            centerOnCell(x, y, 192);
             setSelectedCell({ x, y });
           }}
         />
