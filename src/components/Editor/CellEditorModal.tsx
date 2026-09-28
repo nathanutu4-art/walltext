@@ -85,7 +85,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
   // Metadata inputs
   const [messageCaption, setMessageCaption] = useState<string>('');
   const [authorName, setAuthorName] = useState<string>('');
-  const [dominantColor, setDominantColor] = useState<string>('#ffffff');
+  const [dominantColor, setDominantColor] = useState<string>('#000000');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -409,45 +409,59 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // Dynamically compute the true dominant color (warna terbanyak pada canvas)
+  // Dynamically compute the dominant brush or text color (excluding background)
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const colorWeights: Record<string, number> = {};
 
-    try {
-      const w = CANVAS_DISPLAY_SIZE;
-      const h = CANVAS_DISPLAY_SIZE;
-      const imgData = ctx.getImageData(0, 0, w, h).data;
-      const counts: Record<string, number> = {};
-      const step = 6; // Sample every 6th pixel (64x64 samples = 4096 samples, execution < 0.3ms)
-
-      for (let y = 0; y < h; y += step) {
-        for (let x = 0; x < w; x += step) {
-          const idx = (y * w + x) * 4;
-          if (imgData[idx + 3] < 128) continue;
-          const r = imgData[idx];
-          const g = imgData[idx + 1];
-          const b = imgData[idx + 2];
-          const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-          counts[hex] = (counts[hex] || 0) + 1;
+    // 1. Calculate weighted area of all drawn strokes
+    for (const stroke of strokes) {
+      if (!stroke || !stroke.points || stroke.points.length === 0) continue;
+      const col = stroke.color;
+      if (!col) continue;
+      const w = stroke.width || 4;
+      let len = 0;
+      if (stroke.points.length === 1) {
+        len = w;
+      } else {
+        for (let i = 1; i < stroke.points.length; i++) {
+          const p1 = stroke.points[i - 1];
+          const p2 = stroke.points[i];
+          if (p1 && p2) {
+            len += Math.hypot(p2.x - p1.x, p2.y - p1.y);
+          }
         }
       }
-
-      let topColor = bgColor;
-      let maxCount = -1;
-      for (const [col, count] of Object.entries(counts)) {
-        if (count > maxCount) {
-          maxCount = count;
-          topColor = col;
-        }
-      }
-      setDominantColor(topColor);
-    } catch {
-      setDominantColor(bgColor);
+      const area = len * w;
+      colorWeights[col] = (colorWeights[col] || 0) + area;
     }
-  }, [strokes, texts, bgColor]);
+
+    // 2. Calculate weighted area of all text elements
+    for (const t of texts) {
+      if (!t || !t.text) continue;
+      const col = t.color;
+      if (!col) continue;
+      const sz = t.size || 20;
+      const textChars = t.text.replace(/\s/g, '').length;
+      const area = textChars * (sz * sz * 0.5);
+      colorWeights[col] = (colorWeights[col] || 0) + area;
+    }
+
+    let topColor: string | null = null;
+    let maxWeight = 0;
+    for (const [col, weight] of Object.entries(colorWeights)) {
+      if (weight > maxWeight) {
+        maxWeight = weight;
+        topColor = col;
+      }
+    }
+
+    // Prioritize drawn brush/text dominant color, otherwise fallback to current brushColor (never background)
+    if (topColor) {
+      setDominantColor(topColor);
+    } else {
+      setDominantColor(brushColor);
+    }
+  }, [strokes, texts, brushColor]);
 
   // Pointer event coordinate mapping (Normalized 0..255)
   const getNormalizedPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {

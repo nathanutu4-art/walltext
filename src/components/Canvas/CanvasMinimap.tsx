@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { ViewportState, CanvasCell, CANVAS_WIDTH, CANVAS_HEIGHT } from '@/types/canvas';
+import { CanvasRenderer } from '@/lib/canvas-renderer';
 import { Compass } from 'lucide-react';
 
 interface CanvasMinimapProps {
@@ -48,7 +49,7 @@ export const CanvasMinimap: React.FC<CanvasMinimapProps> = ({
     for (const cell of cells) {
       const mx = cell.x * scaleX;
       const my = cell.y * scaleY;
-      ctx.fillStyle = cell.dominant_color || '#fbbf24';
+      ctx.fillStyle = CanvasRenderer.getCellDominantColor(cell);
       ctx.fillRect(Math.floor(mx), Math.floor(my), 2, 2);
     }
 

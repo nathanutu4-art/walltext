@@ -221,23 +221,16 @@ export class CanvasRenderer {
   }
 
   /**
-   * Calculate the true dominant color of a cell (warna terbanyak pada canvas).
-   * Analyzes background, strokes, and texts area weights.
+   * Calculate the true dominant color of a cell (warna terbanyak dari brush / text).
+   * Analyzes strokes and texts area weights, excluding background.
    */
   public static getCellDominantColor(cell: CanvasCell): string {
     if (cell.vector_data) {
-      const bg = cell.vector_data.bg || '#ffffff';
       const strokes = cell.vector_data.strokes || [];
       const texts = cell.vector_data.texts || [];
 
-      if (strokes.length === 0 && texts.length === 0) {
-        return bg;
-      }
-
-      // Track area in 256x256 space (total 65536 units)
+      // Track area in 256x256 space from strokes and texts only (excluding background)
       const colorAreas: Record<string, number> = {};
-      const totalArea = 256 * 256;
-      let drawnArea = 0;
 
       // Strokes area estimation
       for (const stroke of strokes) {
@@ -258,7 +251,6 @@ export class CanvasRenderer {
         }
         const strokeArea = len * w;
         colorAreas[color] = (colorAreas[color] || 0) + strokeArea;
-        drawnArea += strokeArea;
       }
 
       // Texts area estimation
@@ -267,24 +259,30 @@ export class CanvasRenderer {
         const color = t.color || '#000000';
         const sz = t.size || 20;
         const textLen = t.text.replace(/\s/g, '').length;
-        const textArea = textLen * sz * sz * 0.45;
+        const textArea = textLen * sz * sz * 0.5;
         colorAreas[color] = (colorAreas[color] || 0) + textArea;
-        drawnArea += textArea;
       }
 
-      // Remaining area is filled by the background color
-      const remainingBg = Math.max(0, totalArea - drawnArea);
-      colorAreas[bg] = (colorAreas[bg] || 0) + remainingBg;
-
-      let topColor = bg;
-      let maxArea = -1;
+      let topColor: string | null = null;
+      let maxArea = 0;
       for (const [col, area] of Object.entries(colorAreas)) {
         if (area > maxArea) {
           maxArea = area;
           topColor = col;
         }
       }
-      return topColor;
+
+      if (topColor) return topColor;
+
+      // Fallback if no strokes or texts
+      const bg = cell.vector_data.bg;
+      if (cell.dominant_color && cell.dominant_color !== bg) {
+        return cell.dominant_color;
+      }
+      if (cell.dominant_color) {
+        return cell.dominant_color;
+      }
+      return '#fbbf24';
     }
 
     return cell.dominant_color || '#fbbf24';
