@@ -696,55 +696,72 @@ export const InfiniteCanvas: React.FC = () => {
 
       {/* Selected Cell Action Bar (Floating at bottom center, elevated above bottom controls on mobile) */}
       {selectedCell && (
-        <div className="absolute bottom-[100px] sm:bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 sm:gap-2 bg-white border-2 sm:border-3 border-black p-1 sm:p-2 shadow-[4px_4px_0px_#000000] sm:shadow-[5px_5px_0px_#000000] text-black animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[95vw]">
-          <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-slate-100 border border-black font-pixel text-[8px] sm:text-[10px] font-bold shrink-0">
-            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600" />
-            <span><span className="hidden min-[380px]:inline">SLOT </span>({selectedCell.x}, {selectedCell.y})</span>
+        <div className="absolute bottom-28 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-white border-2 sm:border-3 border-black p-1.5 sm:p-2 shadow-[4px_4px_0px_#000000] sm:shadow-[5px_5px_0px_#000000] text-black animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[92vw] sm:max-w-none">
+          {/* Top row / Header on mobile: Coordinates + Close button */}
+          <div className="flex items-center justify-between w-full sm:w-auto gap-2">
+            <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:py-1 bg-slate-100 border border-black font-pixel text-[9px] sm:text-[10px] font-bold shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-amber-600" />
+              <span>SLOT ({selectedCell.x}, {selectedCell.y})</span>
+            </div>
+
+            {/* Mobile close button on top right of the card */}
+            <button
+              onClick={() => {
+                setSelectedCell(null);
+                requestRepaint();
+              }}
+              title="Tutup Seleksi"
+              className="sm:hidden p-1 hover:bg-slate-200 border border-black cursor-pointer text-slate-700 hover:text-black transition-colors shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
 
+          {/* Action content: Claim or Inspect */}
           {selectedCellData ? (
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span
-                className="w-3 h-3 sm:w-3.5 sm:h-3.5 border border-black shadow-[1px_1px_0px_#000000] shrink-0"
-                style={{ backgroundColor: CanvasRenderer.getCellDominantColor(selectedCellData) }}
-              />
-              <span className="font-mono text-[11px] sm:text-xs font-bold text-slate-800 truncate max-w-[80px] sm:max-w-[140px]">
-                {selectedCellData.author_name || 'Anon'}
-              </span>
+            <div className="flex items-center justify-between w-full sm:w-auto gap-1.5 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className="w-3.5 h-3.5 border border-black shadow-[1px_1px_0px_#000000] shrink-0"
+                  style={{ backgroundColor: CanvasRenderer.getCellDominantColor(selectedCellData) }}
+                />
+                <span className="font-mono text-xs font-bold text-slate-800 truncate max-w-[100px] sm:max-w-[140px]">
+                  {selectedCellData.author_name || 'Anon'}
+                </span>
+              </div>
               <button
                 onClick={() => setInspectedCell(selectedCellData)}
-                className="flex items-center gap-1 px-2 sm:px-3 py-1 bg-[#fbbf24] hover:bg-[#f59e0b] border-2 border-black font-pixel text-[8px] sm:text-[10px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer shrink-0"
+                className="flex items-center justify-center gap-1 px-3 py-1.5 bg-[#fbbf24] hover:bg-[#f59e0b] border-2 border-black font-pixel text-[9px] sm:text-[10px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer shrink-0"
               >
-                <Eye className="w-3 h-3 text-black" />
-                <span className="hidden min-[380px]:inline">Lihat Detail</span>
-                <span className="min-[380px]:hidden">Lihat</span>
+                <Eye className="w-3.5 h-3.5 text-black" />
+                <span>Lihat Detail</span>
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <span className="font-pixel text-[8px] sm:text-[9px] text-emerald-700 font-bold px-1 hidden sm:inline">
+            <div className="flex items-center justify-between w-full sm:w-auto gap-2 shrink-0">
+              <span className="font-pixel text-[9px] text-emerald-700 font-bold px-1 sm:inline">
                 [Tersedia]
               </span>
               <button
                 onClick={() => setEditingCellCoord(selectedCell)}
-                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#fbbf24] hover:bg-[#f59e0b] border-2 border-black font-pixel text-[9px] sm:text-[11px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                className="flex items-center justify-center gap-1.5 flex-1 sm:flex-initial px-3 py-1.5 bg-[#fbbf24] hover:bg-[#f59e0b] border-2 border-black font-pixel text-[10px] sm:text-[11px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
               >
-                <PlusCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-black" />
-                <span className="hidden min-[380px]:inline">Klaim Slot Ini</span>
-                <span className="min-[380px]:hidden">Klaim</span>
+                <PlusCircle className="w-3.5 h-3.5 text-black" />
+                <span>Klaim Slot Ini</span>
               </button>
             </div>
           )}
 
+          {/* Desktop close button */}
           <button
             onClick={() => {
               setSelectedCell(null);
               requestRepaint();
             }}
             title="Tutup Seleksi"
-            className="p-1 hover:bg-slate-200 border border-transparent hover:border-black cursor-pointer text-slate-500 hover:text-black transition-colors shrink-0"
+            className="hidden sm:block p-1 hover:bg-slate-200 border border-transparent hover:border-black cursor-pointer text-slate-500 hover:text-black transition-colors shrink-0"
           >
-            <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}

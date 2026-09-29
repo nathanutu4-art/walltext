@@ -32,7 +32,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   };
 
   return (
-    <div className="absolute bottom-3 sm:bottom-5 left-3 sm:left-5 z-20 flex flex-col gap-1.5 sm:gap-2">
+    <div className="absolute bottom-12 sm:bottom-5 left-3 sm:left-5 z-20 flex flex-col gap-1.5 sm:gap-2">
       {/* Search / Teleport button */}
       <button
         onClick={onOpenSearch}

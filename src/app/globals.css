@@ -25,6 +25,8 @@
 
 html, body {
   cursor: var(--cursor-yellow-rect);
+  height: 100%;
+  height: 100dvh;
 }
 
 body:active {
