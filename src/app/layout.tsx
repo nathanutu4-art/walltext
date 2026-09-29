@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Press_Start_2P, VT323 } from 'next/font/google';
 import './globals.css';
 
@@ -13,6 +13,14 @@ const vt323Font = VT323({
   variable: '--font-mono-pixel',
   subsets: ['latin'],
 });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'PixelCraft &bull; Retro Infinite Canvas',
@@ -30,7 +38,7 @@ export default function RootLayout({
       lang="id"
       className={`${pixelFont.variable} ${vt323Font.variable} h-full antialiased`}
     >
-      <body className="h-full w-full overflow-hidden bg-white text-black font-pixel select-none">
+      <body className="h-full w-full overflow-hidden bg-white text-black font-pixel select-none overscroll-none touch-none">
         {children}
       </body>
     </html>

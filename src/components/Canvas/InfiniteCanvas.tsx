@@ -83,6 +83,16 @@ export const InfiniteCanvas: React.FC = () => {
   const initialPinchDistRef = useRef<number | null>(null);
   const initialPinchZoomRef = useRef<number>(48);
 
+  // Mobile Touch & Gesture Navigation Refs
+  const touchStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const touchInitialOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isTouchPanningRef = useRef(false);
+  const touchMovedRef = useRef(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+  const lastTapTimeRef = useRef<number>(0);
+  const lastTapCoordRef = useRef<{ x: number; y: number } | null>(null);
+
   // Dirty flag for requestAnimationFrame render loop
   const needsRenderRef = useRef(true);
 
@@ -265,19 +275,20 @@ export const InfiniteCanvas: React.FC = () => {
     return () => cancelAnimationFrame(animId);
   }, [viewport, hoveredCell, selectedCell]);
 
-  // Pointer & Drag Handlers
+  // Mouse Pointer & Drag Handlers (Desktop only)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Only drag with left click or touch
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    // Only handle mouse events here; touch is handled cleanly via TouchEvents
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
 
     isDraggingRef.current = true;
     hasMovedRef.current = false;
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     initialOffsetRef.current = { x: viewport.offsetX, y: viewport.offsetY };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType !== 'mouse') return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -297,7 +308,7 @@ export const InfiniteCanvas: React.FC = () => {
       requestRepaint();
     }
 
-    // Panning
+    // Mouse Panning
     if (isDraggingRef.current) {
       const deltaX = e.clientX - dragStartRef.current.x;
       const deltaY = e.clientY - dragStartRef.current.y;
@@ -316,10 +327,11 @@ export const InfiniteCanvas: React.FC = () => {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType !== 'mouse') return;
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
 
-    // If it was a click without dragging, handle slot selection
+    // If it was a click without dragging, handle slot selection / view detail
     if (!hasMovedRef.current) {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -329,8 +341,20 @@ export const InfiniteCanvas: React.FC = () => {
       const cellCoord = CanvasRenderer.screenToCell(clickX, clickY, viewport);
 
       if (cellCoord) {
-        // Mouse click ONLY selects the grid! Never auto-claim or auto-open modal on mouse click
         setSelectedCell(cellCoord);
+        // "untuk lihat detail bolehkan menggunakan mouse click"
+        const existing = cellsMapRef.current.get(`${cellCoord.x},${cellCoord.y}`);
+        if (existing) {
+          setInspectedCell(existing);
+        } else {
+          canvasStorage.getCellAt(cellCoord.x, cellCoord.y).then((dbCell) => {
+            if (dbCell) {
+              cellsMapRef.current.set(`${dbCell.x},${dbCell.y}`, dbCell);
+              setInspectedCell(dbCell);
+            }
+            requestRepaint();
+          });
+        }
         requestRepaint();
       }
     }
@@ -368,27 +392,90 @@ export const InfiniteCanvas: React.FC = () => {
     requestRepaint();
   };
 
-  // Touch Pinch-to-Zoom
+  // Dedicated Mobile Touch Handlers (Fluid 1-finger swipe, Hold, Double-tap, and 2-finger pinch)
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // 2-Finger Pinch to Zoom
     if (e.touches.length === 2) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      isTouchPanningRef.current = false;
+      touchMovedRef.current = true;
+      isLongPressTriggeredRef.current = false;
+
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
       initialPinchDistRef.current = dist;
       initialPinchZoomRef.current = viewport.cellSize;
+      return;
+    }
+
+    // 1-Finger Navigation & Hold / Double-Tap detection
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      touchInitialOffsetRef.current = { x: viewport.offsetX, y: viewport.offsetY };
+      isTouchPanningRef.current = true;
+      touchMovedRef.current = false;
+      isLongPressTriggeredRef.current = false;
+
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+
+      // Start Hold (Long-Press) timer (~480ms)
+      longPressTimerRef.current = setTimeout(() => {
+        if (!touchMovedRef.current && canvasRef.current) {
+          isLongPressTriggeredRef.current = true;
+          const rect = canvasRef.current.getBoundingClientRect();
+          const cellCoord = CanvasRenderer.screenToCell(
+            touchStartPosRef.current.x - rect.left,
+            touchStartPosRef.current.y - rect.top,
+            viewport
+          );
+
+          if (cellCoord) {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              navigator.vibrate([40, 50, 40]);
+            }
+            setSelectedCell(cellCoord);
+            const existing = cellsMapRef.current.get(`${cellCoord.x},${cellCoord.y}`);
+            if (existing) {
+              setInspectedCell(existing);
+            } else {
+              canvasStorage.getCellAt(cellCoord.x, cellCoord.y).then((dbCell) => {
+                if (dbCell) {
+                  cellsMapRef.current.set(`${dbCell.x},${dbCell.y}`, dbCell);
+                  setInspectedCell(dbCell);
+                } else {
+                  setEditingCellCoord(cellCoord); // Hold on empty grid: Klaim!
+                }
+                requestRepaint();
+              });
+            }
+            requestRepaint();
+          }
+        }
+      }, 480);
     }
   };
 
+  // Fluid 1-finger swipe and 2-finger pinch
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // Multi-touch Pinch Zoom
     if (e.touches.length === 2 && initialPinchDistRef.current !== null) {
-      e.preventDefault();
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
       const factor = dist / initialPinchDistRef.current;
-
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
 
@@ -408,10 +495,105 @@ export const InfiniteCanvas: React.FC = () => {
         };
       });
       requestRepaint();
+      return;
+    }
+
+    // 1-Finger Fluid Pan (Zero delay, instant responsiveness)
+    if (e.touches.length === 1 && isTouchPanningRef.current) {
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - touchStartPosRef.current.x;
+      const deltaY = touch.clientY - touchStartPosRef.current.y;
+
+      if (Math.hypot(deltaX, deltaY) > 8) {
+        touchMovedRef.current = true;
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+      }
+
+      setViewport((prev) => ({
+        ...prev,
+        offsetX: touchInitialOffsetRef.current.x + deltaX,
+        offsetY: touchInitialOffsetRef.current.y + deltaY,
+      }));
+      requestRepaint();
     }
   };
 
-  const handleTouchEnd = () => {
+  // Touch End: Tap, Double-Tap, or Pan Finish
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    initialPinchDistRef.current = null;
+
+    if (isLongPressTriggeredRef.current) {
+      isTouchPanningRef.current = false;
+      return;
+    }
+
+    // If tap without moving
+    if (!touchMovedRef.current && canvasRef.current && e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      const rect = canvasRef.current.getBoundingClientRect();
+      const cellCoord = CanvasRenderer.screenToCell(
+        touch.clientX - rect.left,
+        touch.clientY - rect.top,
+        viewport
+      );
+
+      if (cellCoord) {
+        const now = Date.now();
+        const isDoubleTap =
+          now - lastTapTimeRef.current < 350 &&
+          lastTapCoordRef.current &&
+          lastTapCoordRef.current.x === cellCoord.x &&
+          lastTapCoordRef.current.y === cellCoord.y;
+
+        if (isDoubleTap) {
+          // Double Tap Action: Klaim on empty, or View on claimed!
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(30);
+          }
+          setSelectedCell(cellCoord);
+          const existing = cellsMapRef.current.get(`${cellCoord.x},${cellCoord.y}`);
+          if (existing) {
+            setInspectedCell(existing);
+          } else {
+            canvasStorage.getCellAt(cellCoord.x, cellCoord.y).then((dbCell) => {
+              if (dbCell) {
+                cellsMapRef.current.set(`${dbCell.x},${dbCell.y}`, dbCell);
+                setInspectedCell(dbCell);
+              } else {
+                setEditingCellCoord(cellCoord); // Double tap on empty grid: Klaim!
+              }
+              requestRepaint();
+            });
+          }
+          lastTapTimeRef.current = 0;
+          lastTapCoordRef.current = null;
+        } else {
+          // Single Tap: Selects the grid
+          setSelectedCell(cellCoord);
+          lastTapTimeRef.current = now;
+          lastTapCoordRef.current = cellCoord;
+        }
+        requestRepaint();
+      }
+    }
+
+    isTouchPanningRef.current = false;
+  };
+
+  const handleTouchCancel = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    isTouchPanningRef.current = false;
     initialPinchDistRef.current = null;
   };
 

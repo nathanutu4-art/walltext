@@ -61,8 +61,8 @@ export const CellInspectorModal: React.FC<CellInspectorModalProps> = ({
   const dominantColor = CanvasRenderer.getCellDominantColor(cell);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-md bg-white border-3 border-black shadow-[8px_8px_0px_#000000] text-black flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+      <div className="relative w-full max-w-md bg-white border-3 border-black shadow-[8px_8px_0px_#000000] text-black flex flex-col my-auto max-h-[92vh] overflow-y-auto">
         {/* Header - Yellow Pixel Banner */}
         <div className="bg-[#fbbf24] border-b-2 border-black p-3 sm:p-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">

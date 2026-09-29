@@ -32,12 +32,12 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   };
 
   return (
-    <div className="absolute bottom-5 left-5 z-20 flex flex-col gap-2">
+    <div className="absolute bottom-3 sm:bottom-5 left-3 sm:left-5 z-20 flex flex-col gap-1.5 sm:gap-2">
       {/* Search / Teleport button */}
       <button
         onClick={onOpenSearch}
         title="Cari Pesan atau Teleport Koordinat (Ctrl+K)"
-        className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-[#fbbf24] text-black border-2 border-black shadow-[3px_3px_0px_#000000] font-pixel text-[10px] font-bold active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer group"
+        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-white hover:bg-[#fbbf24] text-black border-2 border-black shadow-[2px_2px_0px_#000000] sm:shadow-[3px_3px_0px_#000000] font-pixel text-[9px] sm:text-[10px] font-bold active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer group w-fit"
       >
         <Search className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Cari / Teleport</span>
@@ -47,37 +47,41 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
       </button>
 
       {/* Floating Control Bar */}
-      <div className="flex items-center bg-white border-2 border-black shadow-[4px_4px_0px_#000000] text-black -space-x-[2px]">
+      <div className="flex items-center bg-white border-2 border-black shadow-[3px_3px_0px_#000000] sm:shadow-[4px_4px_0px_#000000] text-black -space-x-[2px]">
         <button
           onClick={onZoomIn}
           title="Zoom In (+)"
-          className="p-2.5 hover:bg-[#fbbf24] border-r-2 border-black transition-colors cursor-pointer"
+          className="p-2 sm:p-2.5 hover:bg-[#fbbf24] border-r-2 border-black transition-colors cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
 
         <button
           onClick={onZoomOut}
           title="Zoom Out (-)"
-          className="p-2.5 hover:bg-[#fbbf24] border-r-2 border-black transition-colors cursor-pointer"
+          className="p-2 sm:p-2.5 hover:bg-[#fbbf24] border-r-2 border-black transition-colors cursor-pointer"
         >
-          <Minus className="w-4 h-4" />
+          <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
 
         <button
           onClick={() => onResetView(INITIAL_SPAWN_X, INITIAL_SPAWN_Y)}
           title="Kembali ke Pusat Genesis (960, 540)"
-          className="p-2.5 hover:bg-[#fbbf24] border-r-2 border-black transition-colors cursor-pointer"
+          className="p-2 sm:p-2.5 hover:bg-[#fbbf24] border-r-2 border-black transition-colors cursor-pointer"
         >
-          <Home className="w-4 h-4" />
+          <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
 
         <button
           onClick={toggleFullscreen}
           title={isFullscreen ? 'Keluar Fullscreen' : 'Layar Penuh'}
-          className="p-2.5 hover:bg-[#fbbf24] transition-colors cursor-pointer"
+          className="p-2 sm:p-2.5 hover:bg-[#fbbf24] transition-colors cursor-pointer"
         >
-          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          {isFullscreen ? (
+            <Minimize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          ) : (
+            <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          )}
         </button>
       </div>
     </div>

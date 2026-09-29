@@ -632,8 +632,8 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
-      <div className="relative w-full max-w-2xl bg-white border-3 border-black shadow-[8px_8px_0px_#000000] text-black flex flex-col my-auto overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+      <div className="relative w-full max-w-2xl bg-white border-3 border-black shadow-[8px_8px_0px_#000000] text-black flex flex-col my-auto max-h-[94vh] overflow-y-auto">
         {/* Header - Yellow Pixel Banner from Reference */}
         <div className="bg-[#fbbf24] border-b-2 border-black p-3.5 sm:p-4 flex items-center justify-between">
           <div>
