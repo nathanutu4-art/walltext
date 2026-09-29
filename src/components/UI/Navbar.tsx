@@ -6,7 +6,7 @@ import {
   HelpCircle,
   Search,
   PlusCircle,
-  Tv,
+  BrickWall,
   Eye,
   Layers,
   Copy,
@@ -61,13 +61,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="absolute top-0 left-0 right-0 z-30 pointer-events-none p-1.5 sm:p-3.5 flex items-center justify-between gap-1 sm:gap-2 overflow-x-hidden">
       {/* Left Info Group (1 Single Compact Row: Logo + POS + LOD + Slot Count) */}
       <div className="flex items-center gap-1 sm:gap-2">
-        {/* Compact PixelCraft Logo */}
+        {/* Compact Tembok Ratapan Logo */}
         <div className="pointer-events-auto flex items-center gap-1 bg-white border-2 border-black px-1.5 py-1 sm:px-2 shadow-[2px_2px_0px_#000000]">
           <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-[#fbbf24] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000000]">
-            <Tv className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-black" />
+            <BrickWall className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-black" />
           </div>
           <span className="font-pixel text-[9px] sm:text-xs font-bold tracking-wider text-black">
-            PixelCraft
+            Tembok Ratapan
           </span>
         </div>
 

@@ -16,7 +16,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose, isSupabaseConfigu
         <div className="bg-[#fbbf24] border-b-2 border-black p-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-black" />
-            <h3 className="font-pixel text-xs font-bold text-black">PANDUAN PIXELCRAFT</h3>
+            <h3 className="font-pixel text-xs font-bold text-black">PANDUAN TEMBOK RATAPAN</h3>
           </div>
           <button
             onClick={onClose}

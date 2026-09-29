@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'PixelCraft &bull; Retro Infinite Canvas',
+  title: 'Tembok Ratapan &bull; Retro Infinite Canvas',
   description:
     'Kanvas publik kolaboratif 1920 x 1080 bertema Retro Pixel Web. Setiap 1 piksel di mode makro adalah dunia mikro 1:1 berisi doodle dan pesan abadi.',
 };
