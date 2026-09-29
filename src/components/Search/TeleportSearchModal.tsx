@@ -70,13 +70,13 @@ export const TeleportSearchModal: React.FC<TeleportSearchModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg bg-white border-3 border-black shadow-[8px_8px_0px_#000000] text-black flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="relative w-full max-w-lg max-h-[92vh] bg-white border-3 border-black shadow-[8px_8px_0px_#000000] text-black flex flex-col overflow-hidden">
         {/* Header - Yellow Pixel Banner */}
-        <div className="bg-[#fbbf24] border-b-2 border-black p-3.5 flex items-center justify-between">
+        <div className="bg-[#fbbf24] border-b-2 border-black p-3 sm:p-3.5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Navigation className="w-4 h-4 text-black" />
-            <h3 className="font-pixel text-xs font-bold text-black">TELEPORT & CARI PESAN</h3>
+            <h3 className="font-pixel text-[11px] sm:text-xs font-bold text-black">TELEPORT & CARI PESAN</h3>
           </div>
           <button
             onClick={onClose}
@@ -86,7 +86,7 @@ export const TeleportSearchModal: React.FC<TeleportSearchModalProps> = ({
           </button>
         </div>
 
-        <div className="p-4 sm:p-5 flex flex-col gap-4">
+        <div className="p-3 sm:p-5 flex flex-col gap-3 sm:gap-4 overflow-y-auto">
           {/* Coordinate Jump Form */}
           <form
             onSubmit={handleCoordinateTeleport}
