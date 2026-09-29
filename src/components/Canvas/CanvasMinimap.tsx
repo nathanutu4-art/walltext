@@ -86,7 +86,7 @@ export const CanvasMinimap: React.FC<CanvasMinimapProps> = ({
 
   if (isCollapsed) {
     return (
-      <div className="absolute bottom-12 sm:bottom-5 right-3 sm:right-5 z-20">
+      <div className="absolute bottom-[18vh] sm:bottom-5 right-3 sm:right-5 z-20">
         <button
           onClick={() => setIsCollapsed(false)}
           title="Buka Radar Peta"
@@ -100,7 +100,7 @@ export const CanvasMinimap: React.FC<CanvasMinimapProps> = ({
   }
 
   return (
-    <div className="absolute bottom-12 sm:bottom-5 right-3 sm:right-5 z-20">
+    <div className="absolute bottom-[18vh] sm:bottom-5 right-3 sm:right-5 z-20">
       <div className="bg-white border-2 border-black shadow-[3px_3px_0px_#000000] sm:shadow-[4px_4px_0px_#000000] overflow-hidden">
         {/* Yellow Header Ribbon */}
         <div className="bg-[#fbbf24] border-b-2 border-black px-1.5 sm:px-2 py-0.5 sm:py-1 flex items-center justify-between text-[8px] sm:text-[9px] font-pixel text-black font-bold select-none">
