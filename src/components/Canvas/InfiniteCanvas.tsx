@@ -21,6 +21,7 @@ import { CellEditorModal } from '../Editor/CellEditorModal';
 import { TeleportSearchModal } from '../Search/TeleportSearchModal';
 import { Navbar } from '../UI/Navbar';
 import { HelpModal } from '../UI/HelpModal';
+import { MapPin, Eye, PlusCircle, X } from 'lucide-react';
 
 export const InfiniteCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -42,8 +43,31 @@ export const InfiniteCanvas: React.FC = () => {
   // Interaction State
   const [hoveredCell, setHoveredCell] = useState<{ x: number; y: number } | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
+  const [selectedCellData, setSelectedCellData] = useState<CanvasCell | null>(null);
   const [inspectedCell, setInspectedCell] = useState<CanvasCell | null>(null);
   const [editingCellCoord, setEditingCellCoord] = useState<{ x: number; y: number } | null>(null);
+
+  // Sync selectedCellData whenever selectedCell changes
+  useEffect(() => {
+    if (!selectedCell) {
+      setSelectedCellData(null);
+      return;
+    }
+    const key = `${selectedCell.x},${selectedCell.y}`;
+    const cached = cellsMapRef.current.get(key);
+    if (cached) {
+      setSelectedCellData(cached);
+    } else {
+      canvasStorage.getCellAt(selectedCell.x, selectedCell.y).then((dbCell) => {
+        if (dbCell) {
+          cellsMapRef.current.set(key, dbCell);
+          setSelectedCellData(dbCell);
+        } else {
+          setSelectedCellData(null);
+        }
+      });
+    }
+  }, [selectedCell]);
 
   // Modals
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -295,7 +319,7 @@ export const InfiniteCanvas: React.FC = () => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
 
-    // If it was a click without dragging, handle slot interaction
+    // If it was a click without dragging, handle slot selection
     if (!hasMovedRef.current) {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -305,22 +329,9 @@ export const InfiniteCanvas: React.FC = () => {
       const cellCoord = CanvasRenderer.screenToCell(clickX, clickY, viewport);
 
       if (cellCoord) {
+        // Mouse click ONLY selects the grid! Never auto-claim or auto-open modal on mouse click
         setSelectedCell(cellCoord);
-        const existing = cellsMapRef.current.get(`${cellCoord.x},${cellCoord.y}`);
-        if (existing) {
-          setInspectedCell(existing);
-          requestRepaint();
-        } else {
-          canvasStorage.getCellAt(cellCoord.x, cellCoord.y).then((dbCell) => {
-            if (dbCell) {
-              cellsMapRef.current.set(`${dbCell.x},${dbCell.y}`, dbCell);
-              setInspectedCell(dbCell);
-            } else {
-              setEditingCellCoord(cellCoord);
-            }
-            requestRepaint();
-          });
-        }
+        requestRepaint();
       }
     }
   };
@@ -460,10 +471,12 @@ export const InfiniteCanvas: React.FC = () => {
           const target = selectedCell || hoveredCell || { x: INITIAL_SPAWN_X, y: INITIAL_SPAWN_Y };
           setEditingCellCoord(target);
         }}
+        onInspectCell={(cell) => setInspectedCell(cell)}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenHelp={() => setIsHelpOpen(true)}
         onResetView={(x, y) => centerOnCell(x ?? INITIAL_SPAWN_X, y ?? INITIAL_SPAWN_Y, 52)}
         selectedCell={selectedCell}
+        selectedCellData={selectedCellData}
         cursorCell={hoveredCell}
         cellSize={viewport.cellSize}
         lodMode={lodMode}
@@ -498,6 +511,59 @@ export const InfiniteCanvas: React.FC = () => {
         cells={allCellsArray}
         onTeleportToCell={(x, y) => centerOnCell(x, y)}
       />
+
+      {/* Selected Cell Action Bar (Floating at bottom center) */}
+      {selectedCell && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white border-3 border-black p-1.5 sm:p-2 shadow-[5px_5px_0px_#000000] text-black animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[95vw]">
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 border border-black font-pixel text-[9px] sm:text-[10px] font-bold shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-amber-600" />
+            <span>SLOT ({selectedCell.x}, {selectedCell.y})</span>
+          </div>
+
+          {selectedCellData ? (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="w-3.5 h-3.5 border border-black shadow-[1px_1px_0px_#000000] shrink-0"
+                style={{ backgroundColor: CanvasRenderer.getCellDominantColor(selectedCellData) }}
+              />
+              <span className="font-mono text-xs font-bold text-slate-800 truncate max-w-[90px] sm:max-w-[140px]">
+                {selectedCellData.author_name || 'Anon'}
+              </span>
+              <button
+                onClick={() => setInspectedCell(selectedCellData)}
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-[#fbbf24] hover:bg-[#f59e0b] border-2 border-black font-pixel text-[9px] sm:text-[10px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer shrink-0"
+              >
+                <Eye className="w-3 h-3 text-black" />
+                <span>Lihat Detail</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="font-pixel text-[9px] text-emerald-700 font-bold px-1 hidden sm:inline">
+                [Tersedia]
+              </span>
+              <button
+                onClick={() => setEditingCellCoord(selectedCell)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fbbf24] hover:bg-[#f59e0b] border-2 border-black font-pixel text-[10px] sm:text-[11px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-black" />
+                <span>Klaim Slot Ini</span>
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              setSelectedCell(null);
+              requestRepaint();
+            }}
+            title="Tutup Seleksi"
+            className="p-1 hover:bg-slate-200 border border-transparent hover:border-black cursor-pointer text-slate-500 hover:text-black transition-colors shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Cell Inspector Modal (When clicking existing claimed cell) */}
       {inspectedCell && (

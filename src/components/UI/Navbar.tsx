@@ -13,7 +13,7 @@ import {
   Check,
   Radio,
 } from 'lucide-react';
-import { LodMode, MICRO_LOD_THRESHOLD } from '@/types/canvas';
+import { LodMode, MICRO_LOD_THRESHOLD, CanvasCell } from '@/types/canvas';
 import { INITIAL_SPAWN_X, INITIAL_SPAWN_Y } from '@/lib/seed-data';
 
 interface NavbarProps {
@@ -22,6 +22,8 @@ interface NavbarProps {
   onOpenHelp: () => void;
   onResetView?: (x: number, y: number) => void;
   selectedCell: { x: number; y: number } | null;
+  selectedCellData?: CanvasCell | null;
+  onInspectCell?: (cell: CanvasCell) => void;
   cursorCell: { x: number; y: number } | null;
   cellSize: number;
   lodMode: LodMode;
@@ -35,6 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenHelp,
   onResetView,
   selectedCell,
+  selectedCellData,
+  onInspectCell,
   cursorCell,
   cellSize,
   lodMode,
@@ -126,17 +130,32 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden md:inline">Home</span>
         </button>
 
-        {/* Claim / Create Button */}
-        <button
-          onClick={onOpenCreate}
-          title="Klaim Slot / Buat Karya Baru"
-          className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[10px] font-bold transition-colors cursor-pointer"
-        >
-          <PlusCircle className="w-3 h-3 text-amber-600" />
-          <span className="hidden sm:inline">
-            {selectedCell ? `Klaim (${selectedCell.x}, ${selectedCell.y})` : 'Klaim'}
-          </span>
-        </button>
+        {/* Claim / Create or Inspect Button */}
+        {selectedCellData ? (
+          <button
+            onClick={() => onInspectCell && onInspectCell(selectedCellData)}
+            title="Lihat Detail Karya Slot Ini"
+            className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-black border-2 border-black font-pixel text-[10px] font-bold transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
+          >
+            <Eye className="w-3 h-3 text-amber-600" />
+            <span className="hidden sm:inline">
+              Lihat ({selectedCell?.x}, {selectedCell?.y})
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={onOpenCreate}
+            title={selectedCell ? `Klaim Slot (${selectedCell.x}, ${selectedCell.y})` : 'Klaim Slot Baru'}
+            className={`flex items-center gap-1 px-2.5 py-1 text-black border-2 border-black font-pixel text-[10px] font-bold transition-colors cursor-pointer ${
+              selectedCell ? 'bg-[#fbbf24] hover:bg-[#f59e0b] shadow-[2px_2px_0px_#000000]' : 'bg-white hover:bg-slate-100 shadow-[1px_1px_0px_#000000]'
+            }`}
+          >
+            <PlusCircle className={`w-3 h-3 ${selectedCell ? 'text-black' : 'text-amber-600'}`} />
+            <span className="hidden sm:inline">
+              {selectedCell ? `Klaim (${selectedCell.x}, ${selectedCell.y})` : 'Klaim'}
+            </span>
+          </button>
+        )}
 
         {/* Teleport / Search Button */}
         <button
