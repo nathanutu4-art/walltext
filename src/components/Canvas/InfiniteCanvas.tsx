@@ -23,6 +23,72 @@ import { Navbar } from '../UI/Navbar';
 import { HelpModal } from '../UI/HelpModal';
 import { MapPin, Eye, PlusCircle, X } from 'lucide-react';
 
+/**
+ * Parse cell coordinates from URL Hash (#960,540, #x=960&y=540) or Query Search (?x=960&y=540, ?slot=960,540)
+ */
+function parseCoordinateFromUrl(): { x: number; y: number } | null {
+  if (typeof window === 'undefined') return null;
+
+  // 1. Try URL search params (?x=960&y=540, ?slot=960,540, ?coord=960,540, ?cell=960,540)
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const qx = params.get('x');
+    const qy = params.get('y');
+    if (qx !== null && qy !== null) {
+      const x = parseInt(qx, 10);
+      const y = parseInt(qy, 10);
+      if (!isNaN(x) && !isNaN(y) && x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT) {
+        return { x, y };
+      }
+    }
+    const slot = params.get('slot') || params.get('coord') || params.get('cell');
+    if (slot) {
+      const parts = slot.split(',');
+      if (parts.length === 2) {
+        const x = parseInt(parts[0], 10);
+        const y = parseInt(parts[1], 10);
+        if (!isNaN(x) && !isNaN(y) && x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT) {
+          return { x, y };
+        }
+      }
+    }
+  } catch {
+    // Ignore error
+  }
+
+  // 2. Try URL hash (#960,540, #x=960&y=540)
+  try {
+    const rawHash = window.location.hash.replace(/^#/, '').trim();
+    if (rawHash) {
+      if (rawHash.includes('=')) {
+        const hashParams = new URLSearchParams(rawHash);
+        const hx = hashParams.get('x');
+        const hy = hashParams.get('y');
+        if (hx !== null && hy !== null) {
+          const x = parseInt(hx, 10);
+          const y = parseInt(hy, 10);
+          if (!isNaN(x) && !isNaN(y) && x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT) {
+            return { x, y };
+          }
+        }
+      }
+      // Direct comma separated #960,540
+      const parts = rawHash.split(',');
+      if (parts.length === 2) {
+        const x = parseInt(parts[0], 10);
+        const y = parseInt(parts[1], 10);
+        if (!isNaN(x) && !isNaN(y) && x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT) {
+          return { x, y };
+        }
+      }
+    }
+  } catch {
+    // Ignore error
+  }
+
+  return null;
+}
+
 export const InfiniteCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -123,18 +189,21 @@ export const InfiniteCanvas: React.FC = () => {
     [requestRepaint]
   );
 
-  // Initialize canvas size and center on genesis tile
+  // Initialize canvas size and center on genesis tile (or URL coordinate if present)
   useEffect(() => {
     const updateDimensions = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
 
       setViewport((prev) => {
-        // If first initialization, center on origin
+        // If first initialization, center on URL coord if present, otherwise default origin
         if (prev.width === 0 && prev.height === 0) {
-          const initZoom = 64;
-          const initOffsetX = w / 2 - (INITIAL_SPAWN_X + 0.5) * initZoom;
-          const initOffsetY = h / 2 - (INITIAL_SPAWN_Y + 0.5) * initZoom;
+          const urlCoord = parseCoordinateFromUrl();
+          const spawnX = urlCoord ? urlCoord.x : INITIAL_SPAWN_X;
+          const spawnY = urlCoord ? urlCoord.y : INITIAL_SPAWN_Y;
+          const initZoom = urlCoord ? 192 : 64;
+          const initOffsetX = w / 2 - (spawnX + 0.5) * initZoom;
+          const initOffsetY = h / 2 - (spawnY + 0.5) * initZoom;
           return {
             offsetX: initOffsetX,
             offsetY: initOffsetY,
@@ -153,6 +222,54 @@ export const InfiniteCanvas: React.FC = () => {
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, [requestRepaint]);
+
+  // Handle shared coordinate URL / Hash: navigate to coordinate and open preview modal
+  useEffect(() => {
+    let isCancelled = false;
+
+    const handleUrlCoordinate = async () => {
+      const coord = parseCoordinateFromUrl();
+      if (!coord) return;
+
+      setSelectedCell(coord);
+      centerOnCell(coord.x, coord.y, 192);
+
+      // Check local cache or fetch from storage
+      const key = `${coord.x},${coord.y}`;
+      let cell = cellsMapRef.current.get(key) || null;
+      if (!cell) {
+        cell = await canvasStorage.getCellAt(coord.x, coord.y);
+      }
+
+      if (isCancelled) return;
+
+      if (cell) {
+        cellsMapRef.current.set(key, cell);
+        setAllCellsArray((prev) => {
+          if (!prev.some((c) => c.x === cell!.x && c.y === cell!.y)) {
+            return [...prev, cell!];
+          }
+          return prev;
+        });
+        setSelectedCellData(cell);
+        setInspectedCell(cell);
+        requestRepaint();
+      } else {
+        setSelectedCellData(null);
+      }
+    };
+
+    handleUrlCoordinate();
+
+    window.addEventListener('hashchange', handleUrlCoordinate);
+    window.addEventListener('popstate', handleUrlCoordinate);
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener('hashchange', handleUrlCoordinate);
+      window.removeEventListener('popstate', handleUrlCoordinate);
+    };
+  }, [centerOnCell, requestRepaint]);
 
   // Repaint once fonts have finished loading
   useEffect(() => {
@@ -770,14 +887,25 @@ export const InfiniteCanvas: React.FC = () => {
       {inspectedCell && (
         <CellInspectorModal
           cell={inspectedCell}
-          onClose={() => setInspectedCell(null)}
+          onClose={() => {
+            setInspectedCell(null);
+            if (typeof window !== 'undefined' && window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+          }}
           onZoomIntoCell={(x, y) => {
             centerOnCell(x, y, 256);
             setInspectedCell(null);
+            if (typeof window !== 'undefined' && window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
           }}
           onClaimNeighbor={(nx, ny) => {
             setInspectedCell(null);
             setEditingCellCoord({ x: nx, y: ny });
+            if (typeof window !== 'undefined' && window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
           }}
         />
       )}

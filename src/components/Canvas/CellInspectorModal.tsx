@@ -43,11 +43,52 @@ export const CellInspectorModal: React.FC<CellInspectorModalProps> = ({
     }
   }, [cell]);
 
-  const handleShare = () => {
-    const url = `${window.location.origin}/#${cell.x},${cell.y}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Synchronize browser URL hash to current inspected cell coordinate
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const targetHash = `#${cell.x},${cell.y}`;
+      if (window.location.hash !== targetHash) {
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}${window.location.search}${targetHash}`
+        );
+      }
+    }
+  }, [cell.x, cell.y]);
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}${window.location.pathname}#${cell.x},${cell.y}`;
+    
+    // Use Web Share API if on mobile device
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.share &&
+      /mobile|android|iphone|ipad/i.test(navigator.userAgent)
+    ) {
+      try {
+        await navigator.share({
+          title: `Tembok Ratapan - Slot (${cell.x}, ${cell.y})`,
+          text: cell.message_text
+            ? `"${cell.message_text}" - Slot (${cell.x}, ${cell.y})`
+            : `Lihat karya di Slot (${cell.x}, ${cell.y}) Tembok Ratapan`,
+          url,
+        });
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      } catch {
+        // Fallback to clipboard if share cancelled or failed
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Salin link slot ini:', url);
+    }
   };
 
   const formattedDate = cell.created_at
@@ -136,12 +177,12 @@ export const CellInspectorModal: React.FC<CellInspectorModalProps> = ({
               {copied ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700">Tersalin!</span>
+                  <span className="text-emerald-700">Link Tersalin!</span>
                 </>
               ) : (
                 <>
                   <Share2 className="w-3.5 h-3.5" />
-                  <span>Salin Tautan</span>
+                  <span>Bagikan Link</span>
                 </>
               )}
             </button>
