@@ -24,6 +24,11 @@ import {
   Check,
   Trash2,
   Edit3,
+  Move,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -73,14 +78,15 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const currentStrokeRef = useRef<CanvasStroke | null>(null);
 
-  // Text Tool inputs & on-canvas direct writing state
+  // Text Tool inputs & on-canvas draggable placement state
   const [inputText, setInputText] = useState<string>('');
   const [fontSize, setFontSize] = useState<number>(20);
   const [fontFamily, setFontFamily] = useState<string>('pixel');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
-  const [onCanvasTextPos, setOnCanvasTextPos] = useState<{ x: number; y: number } | null>(null);
-  const [hoverTextPos, setHoverTextPos] = useState<{ x: number; y: number } | null>(null);
+  const [pendingTextPos, setPendingTextPos] = useState<{ x: number; y: number }>({ x: 128, y: 128 });
   const [editingTextIndex, setEditingTextIndex] = useState<number | null>(null);
+  const isDraggingTextRef = useRef<boolean>(false);
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Metadata inputs
   const [messageCaption, setMessageCaption] = useState<string>('');
@@ -182,22 +188,20 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     }
   }, [editingTextIndex]);
 
-  // Commit text from in-place on-canvas editor or sidebar
-  const commitText = useCallback(() => {
+  // Commit/Apply text onto the canvas at current pendingTextPos
+  const applyPendingText = useCallback(() => {
     if (!inputText.trim()) {
       if (editingTextIndex !== null) {
         setTexts((prev) => prev.filter((_, i) => i !== editingTextIndex));
       }
-      setOnCanvasTextPos(null);
       setEditingTextIndex(null);
       return;
     }
 
-    const pos = onCanvasTextPos || { x: 128, y: 128 };
     const newTextItem: CanvasText = {
       text: inputText.trim(),
-      x: pos.x,
-      y: pos.y,
+      x: pendingTextPos.x,
+      y: pendingTextPos.y,
       size: fontSize,
       color: brushColor,
       font: fontFamily,
@@ -210,6 +214,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
         updated[editingTextIndex] = newTextItem;
         return updated;
       });
+      setEditingTextIndex(null);
     } else {
       setTexts((prev) => [...prev, newTextItem]);
     }
@@ -218,12 +223,11 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       setMessageCaption(inputText.trim());
     }
 
-    setOnCanvasTextPos(null);
     setEditingTextIndex(null);
     setInputText('');
   }, [
     inputText,
-    onCanvasTextPos,
+    pendingTextPos,
     fontSize,
     brushColor,
     fontFamily,
@@ -231,6 +235,8 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     editingTextIndex,
     messageCaption,
   ]);
+
+  const commitText = applyPendingText;
 
   // Re-draw editor canvas
   const redrawCanvas = useCallback(() => {
@@ -296,7 +302,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
 
     // Draw all texts safely with multi-line support
     for (let idx = 0; idx < texts.length; idx++) {
-      if (editingTextIndex === idx && onCanvasTextPos) continue;
+      if (editingTextIndex === idx) continue;
 
       const textItem = texts[idx];
       if (!textItem || !textItem.text) continue;
@@ -320,7 +326,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       });
 
       // Subtle dashed selection outline if Text tool is active
-      if (activeTool === 'text' && !onCanvasTextPos) {
+      if (activeTool === 'text') {
         let maxW = 0;
         lines.forEach((line) => {
           const w = ctx.measureText(line).width;
@@ -333,58 +339,107 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
         const by = ty - totalHeight / 2 - pad;
 
         ctx.save();
-        ctx.strokeStyle = idx === editingTextIndex ? '#f59e0b' : 'rgba(251, 191, 36, 0.7)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
         ctx.strokeRect(bx, by, maxW + pad * 2, totalHeight + pad * 2);
         ctx.restore();
       }
     }
 
-    // Live Hover Ghost Preview (when Text tool is active and no active in-place editor)
-    if (
-      activeTool === 'text' &&
-      hoverTextPos &&
-      !onCanvasTextPos &&
-      inputText.trim()
-    ) {
+    // Live Draggable Text on Canvas (when Text tool is active)
+    if (activeTool === 'text') {
+      const displayText = inputText.trim() || 'Ketik teks di sini...';
+      const isPlaceholder = !inputText.trim();
+
       ctx.save();
-      ctx.globalAlpha = 0.65;
+      if (isPlaceholder) {
+        ctx.globalAlpha = 0.55;
+      }
       const fSize = Math.max(8, fontSize * scale);
       const fFace = getResolvedFont(fontFamily);
       ctx.font = `700 ${fSize}px ${fFace}`;
-      ctx.fillStyle = brushColor;
+      ctx.fillStyle = isPlaceholder ? '#64748b' : brushColor;
       ctx.textAlign = textAlign;
       ctx.textBaseline = 'middle';
 
-      const lines = inputText.split('\n');
+      const lines = displayText.split('\n');
       const lineHeight = fSize * 1.3;
       const totalHeight = lines.length * lineHeight;
-      const tx = hoverTextPos.x * scale;
-      const ty = hoverTextPos.y * scale;
+      const tx = pendingTextPos.x * scale;
+      const ty = pendingTextPos.y * scale;
       const startY = ty - totalHeight / 2 + lineHeight / 2;
 
-      // Dashed yellow bounding box
       let maxLineWidth = 0;
       lines.forEach((line) => {
         const w = ctx.measureText(line).width;
         if (w > maxLineWidth) maxLineWidth = w;
       });
 
+      // Draw the text lines
+      lines.forEach((line, i) => {
+        ctx.fillText(line, tx, startY + i * lineHeight);
+      });
+
+      // Draw retro neo-brutalist interactive draggable bounding box
       const pad = 6;
       let boxX = tx - maxLineWidth / 2 - pad;
       if (textAlign === 'left') boxX = tx - pad;
       if (textAlign === 'right') boxX = tx - maxLineWidth - pad;
       const boxY = ty - totalHeight / 2 - pad;
+      const boxW = maxLineWidth + pad * 2;
+      const boxH = totalHeight + pad * 2;
 
+      ctx.globalAlpha = 1.0;
+      // Black outer frame
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([]);
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+      // Yellow dashed inner line
       ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 4]);
-      ctx.strokeRect(boxX, boxY, maxLineWidth + pad * 2, totalHeight + pad * 2);
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
 
-      lines.forEach((line, i) => {
-        ctx.fillText(line, tx, startY + i * lineHeight);
+      // 4 Corner Handles (Retro Pixel Squares)
+      const hSize = 5;
+      const corners = [
+        [boxX, boxY],
+        [boxX + boxW, boxY],
+        [boxX, boxY + boxH],
+        [boxX + boxW, boxY + boxH],
+      ];
+      ctx.setLineDash([]);
+      corners.forEach(([cx, cy]) => {
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(cx - hSize / 2, cy - hSize / 2, hSize, hSize);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx - hSize / 2, cy - hSize / 2, hSize, hSize);
       });
+
+      // Floating Coordinate / Drag Pill Tag on top
+      const badgeText = `✥ GESER (${pendingTextPos.x}, ${pendingTextPos.y})`;
+      ctx.font = '700 8px monospace';
+      const badgeW = ctx.measureText(badgeText).width + 8;
+      const badgeH = 13;
+      const badgeX = Math.max(2, Math.min(CANVAS_DISPLAY_SIZE - badgeW - 2, boxX));
+      const badgeY = Math.max(2, boxY - badgeH - 2);
+
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(badgeX + 1, badgeY + 1, badgeW, badgeH);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
+
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(badgeText, badgeX + 4, badgeY + badgeH / 2);
 
       ctx.restore();
     }
@@ -394,8 +449,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     texts,
     scale,
     activeTool,
-    hoverTextPos,
-    onCanvasTextPos,
+    pendingTextPos,
     inputText,
     fontSize,
     fontFamily,
@@ -492,25 +546,37 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       e.currentTarget.setPointerCapture(e.pointerId);
       eraseNearbyStrokes(pt.x, pt.y);
     } else if (activeTool === 'text') {
-      // Check if clicking near an existing text item to edit
+      // Check if clicking near an existing text item to edit & drag
       const clickedIdx = texts.findIndex(
-        (t) => t && Math.hypot(t.x - pt.x, t.y - pt.y) < 22
+        (t) => t && Math.hypot(t.x - pt.x, t.y - pt.y) < 26
       );
 
       if (clickedIdx >= 0) {
         const t = texts[clickedIdx];
         setEditingTextIndex(clickedIdx);
         setInputText(t.text);
-        setFontSize(t.size || 18);
+        setFontSize(t.size || 20);
         setFontFamily(t.font || 'pixel');
         setBrushColor(t.color || '#fbbf24');
         setTextAlign(t.align || 'center');
-        setOnCanvasTextPos({ x: t.x, y: t.y });
+        setPendingTextPos({ x: t.x, y: t.y });
+        isDraggingTextRef.current = true;
+        dragOffsetRef.current = { x: pt.x - t.x, y: pt.y - t.y };
       } else {
-        // Open on-canvas text editor at clicked coordinate
-        setEditingTextIndex(null);
-        setOnCanvasTextPos(pt);
+        // Drag current text or position it directly at clicked point
+        const distToCurrent = Math.hypot(pendingTextPos.x - pt.x, pendingTextPos.y - pt.y);
+        isDraggingTextRef.current = true;
+        if (distToCurrent < 45) {
+          dragOffsetRef.current = { x: pt.x - pendingTextPos.x, y: pt.y - pendingTextPos.y };
+        } else {
+          setPendingTextPos(pt);
+          dragOffsetRef.current = { x: 0, y: 0 };
+        }
       }
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {}
+      redrawCanvas();
     }
   };
 
@@ -518,7 +584,11 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     const pt = getNormalizedPoint(e);
 
     if (activeTool === 'text') {
-      setHoverTextPos(pt);
+      if (isDraggingTextRef.current) {
+        const nx = Math.max(8, Math.min(247, Math.round(pt.x - dragOffsetRef.current.x)));
+        const ny = Math.max(8, Math.min(247, Math.round(pt.y - dragOffsetRef.current.y)));
+        setPendingTextPos({ x: nx, y: ny });
+      }
       return;
     }
 
@@ -533,13 +603,19 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
   };
 
   const handlePointerLeave = () => {
-    handlePointerUp();
     if (activeTool === 'text') {
-      setHoverTextPos(null);
+      isDraggingTextRef.current = false;
+      return;
     }
+    handlePointerUp();
   };
 
   const handlePointerUp = () => {
+    if (activeTool === 'text') {
+      isDraggingTextRef.current = false;
+      return;
+    }
+
     // CRITICAL: Capture finished stroke synchronously in a local const
     // before clearing currentStrokeRef.current!
     if (
@@ -676,166 +752,79 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                   activeTool === 'brush'
                     ? 'cursor-editor-crosshair'
                     : activeTool === 'text'
-                    ? 'cursor-text'
+                    ? 'cursor-move'
                     : 'cursor-editor-crosshair'
                 }`}
               />
-
-              {/* Floating On-Canvas Direct Writing Editor */}
-              {activeTool === 'text' && onCanvasTextPos && (
-                <div
-                  className="absolute z-20 flex flex-col items-center pointer-events-auto"
-                  style={{
-                    left: `${Math.max(16, Math.min(84, (onCanvasTextPos.x / 255) * 100))}%`,
-                    top: `${Math.max(16, Math.min(84, (onCanvasTextPos.y / 255) * 100))}%`,
-                    transform: 'translate(-50%, -50%)',
-                    width: 'calc(100% - 24px)',
-                    maxWidth: '340px',
-                  }}
-                >
-                  <div className="bg-white/95 backdrop-blur-md border-2 border-black shadow-[4px_4px_0px_#000000] p-2 flex flex-col gap-1.5 w-full">
-                    {/* Header */}
-                    <div className="flex items-center justify-between text-[9px] font-pixel text-black font-bold pb-1 border-b border-black">
-                      <span className="flex items-center gap-1">
-                        <Type className="w-3 h-3 text-amber-600" />
-                        {editingTextIndex !== null ? 'Edit Teks Kanvas' : 'Tulis di Kanvas'}
-                      </span>
-                      <span className="text-[8px] text-slate-500 font-mono">
-                        POS: {onCanvasTextPos.x}, {onCanvasTextPos.y}
-                      </span>
-                    </div>
-
-                    {/* Font Size & Presets Bar */}
-                    <div className="flex items-center justify-between gap-1 bg-amber-50 p-1 border border-black text-[9px] font-pixel">
-                      <span className="text-black font-bold flex items-center gap-0.5">
-                        <Sliders className="w-2.5 h-2.5 text-amber-700" /> Ukuran:
-                      </span>
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => handleFontSizeChange(fontSize - 4)}
-                          disabled={fontSize <= 10}
-                          className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[9px] cursor-pointer disabled:opacity-40"
-                          title="Perkecil Ukuran"
-                        >
-                          -
-                        </button>
-                        <span className="font-mono font-bold text-black min-w-[32px] text-center text-[10px]">
-                          {fontSize}px
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleFontSizeChange(fontSize + 4)}
-                          disabled={fontSize >= 100}
-                          className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[9px] cursor-pointer disabled:opacity-40"
-                          title="Perbesar Ukuran"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-0.5">
-                        {[14, 22, 34, 52, 76].map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            onClick={() => handleFontSizeChange(s)}
-                            className={`px-1 py-0.5 text-[8px] font-mono font-bold border border-black cursor-pointer transition-colors ${
-                              fontSize === s
-                                ? 'bg-[#fbbf24] text-black ring-1 ring-black'
-                                : 'bg-white text-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Direct Textarea on canvas */}
-                    <textarea
-                      autoFocus
-                      rows={3}
-                      placeholder="Ketik langsung di sini... (Ctrl+Enter: Simpan)"
-                      value={inputText}
-                      onChange={(e) => handleInputTextChange(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                          e.preventDefault();
-                          commitText();
-                        } else if (e.key === 'Escape') {
-                          setOnCanvasTextPos(null);
-                          setEditingTextIndex(null);
-                        }
-                      }}
-                      style={{
-                        color: brushColor,
-                        fontFamily: getResolvedFont(fontFamily),
-                        fontSize: `${Math.round(fontSize * scale)}px`,
-                        lineHeight: 1.3,
-                        textAlign: textAlign,
-                      }}
-                      className="w-full bg-slate-900/95 text-white p-2 border border-black focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold placeholder-slate-400 resize-y max-h-[140px]"
-                    />
-
-                    {/* Quick Color Palette & Actions inside floating editor */}
-                    <div className="flex items-center justify-between gap-1 pt-0.5">
-                      <div className="flex items-center gap-1">
-                        {COLOR_PRESETS.slice(0, 6).map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => handleTextColorChange(c)}
-                            className={`w-4 h-4 border border-black shadow-[1px_1px_0px_#000000] cursor-pointer transition-transform ${
-                              brushColor === c ? 'scale-125 ring-1 ring-black' : ''
-                            }`}
-                            style={{ backgroundColor: c }}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-1">
-                        {editingTextIndex !== null && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTexts((prev) => prev.filter((_, i) => i !== editingTextIndex));
-                              setOnCanvasTextPos(null);
-                              setEditingTextIndex(null);
-                              setInputText('');
-                            }}
-                            className="px-1.5 py-1 bg-rose-500 hover:bg-rose-600 text-white font-pixel text-[8px] border border-black shadow-[1px_1px_0px_#000000] flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <Trash2 className="w-2.5 h-2.5" /> Hapus
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOnCanvasTextPos(null);
-                            setEditingTextIndex(null);
-                          }}
-                          className="px-2 py-1 bg-white hover:bg-slate-100 text-black font-pixel text-[8px] border border-black shadow-[1px_1px_0px_#000000] cursor-pointer"
-                        >
-                          Batal
-                        </button>
-                        <button
-                          type="button"
-                          onClick={commitText}
-                          className="px-2.5 py-1 bg-[#fbbf24] hover:bg-[#f59e0b] text-black font-pixel text-[9px] font-bold border border-black shadow-[1px_1px_0px_#000000] flex items-center gap-1 cursor-pointer"
-                        >
-                          <Check className="w-2.5 h-2.5" /> Selesai
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-white border border-black text-[9px] font-pixel text-black shadow-[1px_1px_0px_#000000]">
                 0-255 Vektor &bull; {estimatedSizeKb} KB
               </div>
             </div>
+
+            {/* Interactive Text Drag & Placement Helper Bar (Below Canvas) */}
+            {activeTool === 'text' && (
+              <div className="w-full max-w-[360px] bg-amber-50 border-2 border-black p-2 shadow-[3px_3px_0px_#000000] flex flex-col gap-1.5 animate-in fade-in">
+                <div className="flex items-center justify-between text-[9px] font-pixel text-black font-bold border-b border-black/20 pb-1">
+                  <span className="flex items-center gap-1 text-amber-800">
+                    <Move className="w-3 h-3 text-amber-600 animate-pulse" />
+                    {editingTextIndex !== null ? `Edit Posisi Teks #${editingTextIndex + 1}` : 'Atur & Geser Posisi Teks'}
+                  </span>
+                  <span className="font-mono text-[9px] bg-white px-1.5 py-0.2 border border-black text-slate-800 font-bold">
+                    X: {pendingTextPos.x}, Y: {pendingTextPos.y}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Ketik teks di sini..."
+                    value={inputText}
+                    onChange={(e) => handleInputTextChange(e.target.value)}
+                    className="flex-1 min-w-0 px-2 py-1 bg-white border-2 border-black text-xs font-mono font-bold text-black focus:outline-none focus:bg-amber-100 shadow-[1px_1px_0px_#000000]"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyPendingText}
+                    disabled={!inputText.trim()}
+                    className="px-2.5 py-1 bg-[#fbbf24] hover:bg-[#f59e0b] disabled:opacity-40 border-2 border-black text-black font-pixel text-[9px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Terapkan teks ke posisi ini di kanvas"
+                  >
+                    <Check className="w-3 h-3 text-black" />
+                    <span>Terapkan</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-[8px] font-pixel text-slate-600 pt-0.5">
+                  <span className="flex items-center gap-0.5">
+                    💡 <span className="hidden sm:inline">Klik & tahan di kanvas untuk</span><span>geser posisi teks</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPendingTextPos({ x: 128, y: 128 })}
+                      className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[8px] cursor-pointer"
+                      title="Posisikan Tepat di Tengah (128, 128)"
+                    >
+                      Tengah
+                    </button>
+                    {editingTextIndex !== null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTextIndex(null);
+                          setInputText('');
+                          setPendingTextPos({ x: 128, y: 128 });
+                        }}
+                        className="px-1.5 py-0.5 bg-white hover:bg-rose-100 text-rose-700 border border-black font-bold text-[8px] cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Canvas Actions below canvas */}
             <div className="flex items-center justify-between w-full max-w-[360px] px-1 text-xs">
@@ -961,9 +950,9 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setOnCanvasTextPos(null);
                         setEditingTextIndex(null);
                         setInputText('');
+                        setPendingTextPos({ x: 128, y: 128 });
                       }}
                       className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[8px] cursor-pointer"
                     >
@@ -975,11 +964,82 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                 {/* Multi-line Textarea */}
                 <textarea
                   rows={3}
-                  placeholder="Ketik teks pesan Anda di sini...&#10;Mendukung multi-baris & teks panjang.&#10;Klik langsung di kanvas untuk menempatkan!"
+                  placeholder="Ketik teks pesan Anda di sini...&#10;Mendukung multi-baris & teks panjang.&#10;Sentuh & seret langsung di kanvas untuk posisikan!"
                   value={inputText}
                   onChange={(e) => handleInputTextChange(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border-2 border-black text-xs text-black font-mono placeholder-slate-400 focus:outline-none focus:bg-amber-50 shadow-[1px_1px_0px_#000000] resize-y"
                 />
+
+                {/* Position Adjustment & Nudge D-Pad */}
+                <div className="flex flex-col gap-1.5 p-2 bg-white border-2 border-black shadow-[1px_1px_0px_#000000]">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-pixel text-[9px] text-black font-bold flex items-center gap-1">
+                      <Move className="w-3 h-3 text-amber-600" /> Posisi Teks:
+                    </span>
+                    <span className="font-mono text-[9px] text-amber-800 font-bold bg-amber-50 px-1.5 py-0.2 border border-black">
+                      X: {pendingTextPos.x} | Y: {pendingTextPos.y}
+                    </span>
+                  </div>
+
+                  {/* Nudge Buttons */}
+                  <div className="flex items-center justify-between gap-1 pt-0.5">
+                    <span className="text-[8px] font-pixel text-slate-500">Geser Halus:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPendingTextPos((p) => ({ ...p, x: Math.max(8, p.x - 8) }))}
+                        className="p-1 bg-white hover:bg-slate-100 border border-black font-bold text-xs cursor-pointer"
+                        title="Geser Kiri (X-8)"
+                      >
+                        <ArrowLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingTextPos((p) => ({ ...p, y: Math.max(8, p.y - 8) }))}
+                        className="p-1 bg-white hover:bg-slate-100 border border-black font-bold text-xs cursor-pointer"
+                        title="Geser Atas (Y-8)"
+                      >
+                        <ArrowUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingTextPos((p) => ({ ...p, y: Math.min(247, p.y + 8) }))}
+                        className="p-1 bg-white hover:bg-slate-100 border border-black font-bold text-xs cursor-pointer"
+                        title="Geser Bawah (Y+8)"
+                      >
+                        <ArrowDown className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingTextPos((p) => ({ ...p, x: Math.min(247, p.x + 8) }))}
+                        className="p-1 bg-white hover:bg-slate-100 border border-black font-bold text-xs cursor-pointer"
+                        title="Geser Kanan (X+8)"
+                      >
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPendingTextPos({ x: 128, y: 128 })}
+                      className="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-black border border-black font-pixel text-[8px] font-bold shadow-[1px_1px_0px_#000000] cursor-pointer"
+                      title="Pusatkan tepat di tengah"
+                    >
+                      Pusat
+                    </button>
+                  </div>
+                </div>
+
+                {/* Apply Button in Sidebar */}
+                <button
+                  type="button"
+                  onClick={applyPendingText}
+                  disabled={!inputText.trim()}
+                  className="w-full py-2 px-3 bg-[#fbbf24] hover:bg-[#f59e0b] disabled:opacity-40 border-2 border-black text-black font-pixel text-[10px] font-bold shadow-[3px_3px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5 text-black" />
+                  <span>{editingTextIndex !== null ? 'Perbarui Teks di Kanvas' : 'Terapkan Teks ke Kanvas'}</span>
+                </button>
 
                 {/* Typography Controls: Size with Slider & Presets */}
                 <div className="flex flex-col gap-1.5 p-2 bg-white border-2 border-black shadow-[1px_1px_0px_#000000]">
@@ -1105,7 +1165,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setOnCanvasTextPos({ x: 128, y: 128 });
+                      setPendingTextPos({ x: 128, y: 128 });
                       setEditingTextIndex(null);
                     }}
                     className="px-2 py-1 bg-white hover:bg-slate-100 text-black border border-black font-pixel text-[9px] font-bold shadow-[1px_1px_0px_#000000] cursor-pointer"
@@ -1173,7 +1233,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                                 setFontFamily(t.font || 'pixel');
                                 setBrushColor(t.color);
                                 setTextAlign(t.align || 'center');
-                                setOnCanvasTextPos({ x: t.x, y: t.y });
+                                setPendingTextPos({ x: t.x, y: t.y });
                               }}
                               className="p-0.5 hover:bg-slate-200 border border-transparent hover:border-black cursor-pointer"
                               title="Edit Teks"
