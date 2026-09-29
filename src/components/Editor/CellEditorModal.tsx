@@ -347,19 +347,15 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       }
     }
 
-    // Live Draggable Text on Canvas (when Text tool is active)
-    if (activeTool === 'text') {
-      const displayText = inputText.trim() || 'Ketik teks di sini...';
-      const isPlaceholder = !inputText.trim();
+    // Live Draggable Text on Canvas (when Text tool is active and textarea has text)
+    if (activeTool === 'text' && inputText.trim()) {
+      const displayText = inputText.trim();
 
       ctx.save();
-      if (isPlaceholder) {
-        ctx.globalAlpha = 0.55;
-      }
       const fSize = Math.max(8, fontSize * scale);
       const fFace = getResolvedFont(fontFamily);
       ctx.font = `700 ${fSize}px ${fFace}`;
-      ctx.fillStyle = isPlaceholder ? '#64748b' : brushColor;
+      ctx.fillStyle = brushColor;
       ctx.textAlign = textAlign;
       ctx.textBaseline = 'middle';
 
@@ -546,14 +542,15 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       e.currentTarget.setPointerCapture(e.pointerId);
       eraseNearbyStrokes(pt.x, pt.y);
     } else if (activeTool === 'text') {
-      // Check if clicking near an existing text item to edit & drag
-      const clickedIdx = texts.findIndex(
-        (t) => t && Math.hypot(t.x - pt.x, t.y - pt.y) < 26
+      // 1. Check if clicking on another text in texts list to select it
+      const otherClickedIdx = texts.findIndex(
+        (t, idx) => idx !== editingTextIndex && t && Math.hypot(t.x - pt.x, t.y - pt.y) < 26
       );
 
-      if (clickedIdx >= 0) {
-        const t = texts[clickedIdx];
-        setEditingTextIndex(clickedIdx);
+      if (otherClickedIdx >= 0) {
+        // Select this text from the canvas to edit and adjust
+        const t = texts[otherClickedIdx];
+        setEditingTextIndex(otherClickedIdx);
         setInputText(t.text);
         setFontSize(t.size || 20);
         setFontFamily(t.font || 'pixel');
@@ -562,16 +559,19 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
         setPendingTextPos({ x: t.x, y: t.y });
         isDraggingTextRef.current = true;
         dragOffsetRef.current = { x: pt.x - t.x, y: pt.y - t.y };
-      } else {
-        // Drag current text or position it directly at clicked point
-        const distToCurrent = Math.hypot(pendingTextPos.x - pt.x, pendingTextPos.y - pt.y);
+      } else if (inputText.trim()) {
+        // Adjust the position of the currently selected/active text
         isDraggingTextRef.current = true;
+        const distToCurrent = Math.hypot(pendingTextPos.x - pt.x, pendingTextPos.y - pt.y);
         if (distToCurrent < 45) {
           dragOffsetRef.current = { x: pt.x - pendingTextPos.x, y: pt.y - pendingTextPos.y };
         } else {
           setPendingTextPos(pt);
           dragOffsetRef.current = { x: 0, y: 0 };
         }
+      } else {
+        // If textarea is currently empty, set initial position for when user types
+        setPendingTextPos(pt);
       }
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -762,66 +762,39 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
               </div>
             </div>
 
-            {/* Interactive Text Drag & Placement Helper Bar (Below Canvas) */}
+            {/* Text Tool Position Status (No on-canvas input) */}
             {activeTool === 'text' && (
-              <div className="w-full max-w-[360px] bg-amber-50 border-2 border-black p-2 shadow-[3px_3px_0px_#000000] flex flex-col gap-1.5 animate-in fade-in">
-                <div className="flex items-center justify-between text-[9px] font-pixel text-black font-bold border-b border-black/20 pb-1">
-                  <span className="flex items-center gap-1 text-amber-800">
-                    <Move className="w-3 h-3 text-amber-600 animate-pulse" />
-                    {editingTextIndex !== null ? `Edit Posisi Teks #${editingTextIndex + 1}` : 'Atur & Geser Posisi Teks'}
-                  </span>
-                  <span className="font-mono text-[9px] bg-white px-1.5 py-0.2 border border-black text-slate-800 font-bold">
-                    X: {pendingTextPos.x}, Y: {pendingTextPos.y}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="Ketik teks di sini..."
-                    value={inputText}
-                    onChange={(e) => handleInputTextChange(e.target.value)}
-                    className="flex-1 min-w-0 px-2 py-1 bg-white border-2 border-black text-xs font-mono font-bold text-black focus:outline-none focus:bg-amber-100 shadow-[1px_1px_0px_#000000]"
-                  />
+              <div className="w-full max-w-[360px] bg-amber-50/80 border border-black p-1.5 flex items-center justify-between text-[9px] font-pixel text-slate-700 animate-in fade-in">
+                <span className="flex items-center gap-1 font-bold text-black">
+                  <Move className="w-3 h-3 text-amber-700" />
+                  {inputText.trim() ? (
+                    <span>Posisi di kanvas: ({pendingTextPos.x}, {pendingTextPos.y})</span>
+                  ) : (
+                    <span className="text-slate-500 font-normal">Ketik di kotak teks sebelah kanan</span>
+                  )}
+                </span>
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={applyPendingText}
-                    disabled={!inputText.trim()}
-                    className="px-2.5 py-1 bg-[#fbbf24] hover:bg-[#f59e0b] disabled:opacity-40 border-2 border-black text-black font-pixel text-[9px] font-bold shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer flex items-center gap-1 shrink-0"
-                    title="Terapkan teks ke posisi ini di kanvas"
+                    onClick={() => setPendingTextPos({ x: 128, y: 128 })}
+                    className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[8px] cursor-pointer"
+                    title="Pusatkan posisi di tengah kanvas"
                   >
-                    <Check className="w-3 h-3 text-black" />
-                    <span>Terapkan</span>
+                    Tengah
                   </button>
-                </div>
-
-                <div className="flex items-center justify-between text-[8px] font-pixel text-slate-600 pt-0.5">
-                  <span className="flex items-center gap-0.5">
-                    💡 <span className="hidden sm:inline">Klik & tahan di kanvas untuk</span><span>geser posisi teks</span>
-                  </span>
-                  <div className="flex items-center gap-1">
+                  {editingTextIndex !== null && (
                     <button
                       type="button"
-                      onClick={() => setPendingTextPos({ x: 128, y: 128 })}
-                      className="px-1.5 py-0.5 bg-white hover:bg-slate-100 border border-black font-bold text-[8px] cursor-pointer"
-                      title="Posisikan Tepat di Tengah (128, 128)"
+                      onClick={() => {
+                        setEditingTextIndex(null);
+                        setInputText('');
+                        setPendingTextPos({ x: 128, y: 128 });
+                      }}
+                      className="px-1.5 py-0.5 bg-white hover:bg-rose-100 text-rose-700 border border-black font-bold text-[8px] cursor-pointer"
                     >
-                      Tengah
+                      Batal
                     </button>
-                    {editingTextIndex !== null && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingTextIndex(null);
-                          setInputText('');
-                          setPendingTextPos({ x: 128, y: 128 });
-                        }}
-                        className="px-1.5 py-0.5 bg-white hover:bg-rose-100 text-rose-700 border border-black font-bold text-[8px] cursor-pointer"
-                      >
-                        Batal
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             )}
@@ -938,7 +911,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     <Type className="w-3 h-3 text-amber-600" /> Teks Pesan
                   </span>
                   <span className="text-[8px] font-pixel text-slate-500">
-                    Klik kanvas untuk menulis
+                    Atur posisi di kanvas
                   </span>
                 </div>
 
@@ -1227,6 +1200,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                             <button
                               type="button"
                               onClick={() => {
+                                setActiveTool('text');
                                 setEditingTextIndex(idx);
                                 setInputText(t.text);
                                 setFontSize(t.size || 20);
