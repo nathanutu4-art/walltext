@@ -400,29 +400,6 @@ export class CanvasRenderer {
           ctx.fillText(line, tx, startY + idx * lineHeight);
         });
       }
-    } else if (cell.message_text) {
-      // Fallback for legacy or text-only cells
-      const fontSize = Math.max(6, 22 * scale);
-      ctx.font = `700 ${fontSize}px "Press Start 2P", monospace`;
-      const isDarkBg =
-        cell.vector_data?.bg === '#0f172a' ||
-        cell.vector_data?.bg === '#020617' ||
-        cell.vector_data?.bg === '#1e1035' ||
-        cell.vector_data?.bg === '#1c1917' ||
-        cell.vector_data?.bg === '#2b0914' ||
-        cell.vector_data?.bg === '#022c22';
-      ctx.fillStyle = isDarkBg ? '#ffffff' : '#000000';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      const lines = cell.message_text.split('\n');
-      const lineHeight = fontSize * 1.3;
-      const totalHeight = lines.length * lineHeight;
-      const startY = screenY + cellSize / 2 - totalHeight / 2 + lineHeight / 2;
-
-      lines.forEach((line, idx) => {
-        ctx.fillText(line, screenX + cellSize / 2, startY + idx * lineHeight);
-      });
     }
 
     ctx.restore();

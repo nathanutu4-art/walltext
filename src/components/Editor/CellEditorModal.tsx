@@ -219,10 +219,6 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
       setTexts((prev) => [...prev, newTextItem]);
     }
 
-    if (!messageCaption.trim()) {
-      setMessageCaption(inputText.trim());
-    }
-
     setEditingTextIndex(null);
     setInputText('');
   }, [
@@ -233,7 +229,6 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
     fontFamily,
     textAlign,
     editingTextIndex,
-    messageCaption,
   ]);
 
   const commitText = applyPendingText;
@@ -667,8 +662,8 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
   ).toFixed(2);
 
   const handleSubmit = async () => {
-    if (strokes.length === 0 && texts.length === 0 && !messageCaption.trim()) {
-      setErrorMessage('Silakan gambar goresan atau tambahkan teks pesan!');
+    if (strokes.length === 0 && texts.length === 0) {
+      setErrorMessage('Silakan gambar goresan atau tambahkan teks pada kanvas!');
       return;
     }
 
@@ -1252,12 +1247,17 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
             {/* Metadata: Message & Author */}
             <div className="flex flex-col gap-2">
               <div>
-                <label className="font-pixel text-[9px] text-slate-700 font-bold block mb-1">
-                  Kutipan Pesan (Searchable)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-pixel text-[9px] text-slate-700 font-bold">
+                    Kutipan Pesan (Searchable & Detail)
+                  </label>
+                  <span className="text-[8px] font-pixel text-slate-500">
+                    Tidak digambar di kanvas
+                  </span>
+                </div>
                 <textarea
                   rows={2}
-                  placeholder="Kutipan pesan pencarian (otomatis terisi dari teks kanvas jika kosong)..."
+                  placeholder="Kutipan pesan untuk pencarian & detail slot (hanya tampil saat slot diinspeksi, tidak digambar di kanvas)..."
                   value={messageCaption}
                   onChange={(e) => setMessageCaption(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border-2 border-black text-xs text-black font-mono placeholder-slate-400 focus:outline-none focus:bg-amber-50 shadow-[1px_1px_0px_#000000] resize-y"
