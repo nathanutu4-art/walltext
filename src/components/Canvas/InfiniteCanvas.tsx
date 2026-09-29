@@ -696,7 +696,7 @@ export const InfiniteCanvas: React.FC = () => {
 
       {/* Selected Cell Action Bar (Floating at bottom center, elevated above bottom controls on mobile) */}
       {selectedCell && (
-        <div className="absolute bottom-[32vh] sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-white border-2 sm:border-3 border-black p-1.5 sm:p-2 shadow-[4px_4px_0px_#000000] sm:shadow-[5px_5px_0px_#000000] text-black animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[92vw] sm:max-w-none">
+        <div className="absolute bottom-[22vh] sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 bg-white border-2 sm:border-3 border-black p-1.5 sm:p-2 shadow-[4px_4px_0px_#000000] sm:shadow-[5px_5px_0px_#000000] text-black animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[92vw] sm:max-w-none">
           {/* Top row / Header on mobile: Coordinates + Close button */}
           <div className="flex items-center justify-between w-full sm:w-auto gap-2">
             <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:py-1 bg-slate-100 border border-black font-pixel text-[9px] sm:text-[10px] font-bold shrink-0">
